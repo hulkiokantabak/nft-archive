@@ -51,5 +51,18 @@ html.av-framed,html.av-framed body{overflow:hidden}
 .aw h3{font-size:15px;margin:2px 0 2px}
 .aw .k{font-size:12px;color:#444;margin:2px 0}
 .av-detail{max-width:1100px}
+/* async.html - Async Art, living works: the jump menu, the intro, a group per artist */
+.lw-jump{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin:4px 0 12px;padding:8px 10px;border:1px solid #e5e5e5;border-radius:8px;background:#fafbfc}
+.lw-jump a{padding:3px 11px;border:1px solid #c3c8ce;border-radius:14px;background:#fff;white-space:nowrap}
+.lw-jump a:hover{border-color:#0645ad;text-decoration:none}
+.lw-intro{max-width:780px}
+.lw-intro ul{padding-left:20px;margin:4px 0 10px}
+.lw-intro li{margin:3px 0}
+.lw-how{margin:8px 0 4px;padding:6px 10px;border:1px solid #e5e5e5;border-radius:8px;background:#fafbfc}
+.lw-how>summary{cursor:pointer;font-weight:600;color:#0645ad}
+.lw-how[open]>summary{margin-bottom:6px}
+.aa.lw{margin-top:18px}
+.aa.lw>h2{font-size:20px;margin:22px 0 10px;scroll-margin-top:8px}
+.lw-top{font-size:13px;margin:10px 0 0}
 @media (max-width:640px){.aw-grid{grid-template-columns:1fr}.av-ll ol{columns:1}}
 @media (prefers-reduced-motion:reduce){.av-img{transition:none}}

@@ -591,7 +591,7 @@
     if (this.chainState === 'reading' || this.chainState === 'unread') span.appendChild(document.createTextNode('reading the lever on-chain… '));
     else if (c && c.vals && c.vals.length >= 3 * L.lever + 3) {
       v = c.vals[3 * L.lever + 2];
-      span.appendChild(document.createTextNode('on-chain now: ' + ((L.options[v] || {}).label || ('value ' + v)) + ' (value ' + v + ' of ' + c.vals[3 * L.lever] + '–' + c.vals[3 * L.lever + 1] + '; read ' + pad(this.chainAt.getHours()) + ':' + pad(this.chainAt.getMinutes()) + ' via ' + c.via + ') '));
+      span.appendChild(document.createTextNode('on-chain now: ' + ((L.options[v] || {}).label || ('value ' + v)) + ' (value ' + v + ' of ' + c.vals[3 * L.lever] + '–' + c.vals[3 * L.lever + 1] + '; read ' + pad(this.chainAt.getUTCHours()) + ':' + pad(this.chainAt.getUTCMinutes()) + ' UTC via ' + c.via + ') '));   // UTC, as every other time on the page
     } else if (L.snapshot) {
       span.appendChild(document.createTextNode('our snapshot of ' + (L.snapshot.date || this.m.snapshot_date || '') + ': ' + ((L.options[L.snapshot.value] || {}).label || ('value ' + L.snapshot.value)) + ' (value ' + L.snapshot.value + ' of ' + L.snapshot.min + '–' + L.snapshot.max + (L.snapshot.source ? '; ' + L.snapshot.source : '') + ') '));
     }
@@ -704,19 +704,20 @@
           for (k = 0; i < 0 && k < m.states.length; k++) if (m.states[k].label.toLowerCase().indexOf(want) >= 0) i = k;
           if (i >= 0) hour = m.states[i].hours[0];
         }
-        if (hour === undefined) return;
+        if (hour === undefined) { self.reveal(); return; }
         self.mode = 'slideshow';
         for (k in self.btn) if (Object.prototype.hasOwnProperty.call(self.btn, k)) self.btn[k].setAttribute('aria-pressed', String(k === 'slideshow'));
         self.root.setAttribute('data-av-mode', 'slideshow');
         self.body.hidden = false;
         if (self.still && !self.keepStill) self.still.hidden = true;
         self.startSlides(false, hour);
-        if (Q.w === self.id && self.root.scrollIntoView) self.root.scrollIntoView();
+        self.reveal();
       });
       return;
     }
-    if (mode === 'frame' && this.timed) { this.ensure(function () { self.openFrame(true); }); return; }
-    if (mode) { this.choose(mode, false); return; }
+    if (mode === 'frame' && this.timed) { this.ensure(function () { self.openFrame(true); }); this.reveal(); return; }
+    if (mode) { this.choose(mode, false); this.reveal(); return; }
+    this.reveal();
     mode = sget('mode.' + this.id);
     if (!mode || mode === 'strip' || !this.btn[mode]) return;
     if (mode === 'frame') mode = 'live';   // a remembered Frame reopens as Live: full screen only on the visitor's click
@@ -725,6 +726,14 @@
       if (es.some(function (e) { return e.isIntersecting; })) { io.disconnect(); self.choose(mode, false); }
     }, { rootMargin: '200px' });
     io.observe(this.root);
+  };
+  // a shared link to one work on a page with many (?w=<id>, with or without &mode= / &t= / &state=): that work is brought into view,
+  // its card's title included - before, only ?t= / ?state= scrolled, and ?mode= ran the work out of sight (review of 24 Sep)
+  Viewer.prototype.reveal = function () {
+    var n;
+    if (Q.w !== this.id || CFG.page === 'detail') return;
+    n = (this.root.closest && this.root.closest('.aw, tr')) || this.root;   // the card on async.html, the table row on c/async-art.html
+    if (n.scrollIntoView) n.scrollIntoView();
   };
   function onScreen(n) {
     var r = n.getBoundingClientRect(), h = window.innerHeight || document.documentElement.clientHeight || 0;
