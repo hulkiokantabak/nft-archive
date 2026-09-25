@@ -1,3 +1,79 @@
+/* Embed view (25 Sep 2026): the creators' galleries open a work's page in an iframe, on demand, as async/<id>.html?embed=1
+   (&mode=shuffle for a lever work). The pages are not changed for it: this first block and the html.av-embed rules at the end of
+   async_viewer.css are the whole embed view, and without embed=1 in the query this block does nothing at all.
+   The switch runs first, as soon as this deferred script runs: embed=1 as a whole parameter of the query, on a work's own page (the
+   one .av-detail viewer) -> <html> gets the class av-embed and the page a <base target=_blank>. The style then hides the site's
+   chrome (the tabs, the way back, the files list and everything after it, the footer) and keeps the title, the by-line, the view
+   buttons, the picture or stage and every line the viewer shows (Current state, the Shuffle caption, the layers, the count, the time
+   rule); the Current state picture gets its own ratio (--av-ar, from its width and height) for the style's 880 px cap. Then, on
+   such a page only:
+   (1) one small link under the viewer's lines, "Open in the preservation archive ↗": the same page without embed=1 (mode= and any
+       other parameter kept);
+   (2) every link opens outside the frame (target=_blank rel=noopener): those on the page, those the viewer adds later, any clicked;
+   (3) in a frame only (window.parent !== window), the page's height for the host to size its frame, and nothing else:
+       window.parent.postMessage({type: 'av-embed-height', id: '<the Master id>', height: <whole px, clamped to 200-2400>}, '*')
+       at the start, on load, on resize and whenever the layout changes (ResizeObserver).
+   Nothing is fetched here and no message is read: there is no 'message' listener in this file. The viewer below runs as on the full
+   page (the A+B loading and fallback rules, one viewer per page).
+   Known trade-off: a deferred script cannot mark the page before its first paint, so the full page's chrome may show for a moment
+   inside the frame. The first height message is sent only after the mark, so a host that keeps its frame hidden until that first
+   av-embed-height message never shows it. */
+(function () {
+  'use strict';
+  var de = document.documentElement;
+  if (!de || !de.classList || !document.querySelector || !/[?&]embed=1(&|#|$)/.test(location.search || '')) return;   // not an embed view: nothing
+  var root = document.querySelector('.av-detail[data-av-id]');
+  if (!root) return;   // a work's own page only (async/<id>.html)
+  de.classList.add('av-embed');
+  if (document.head && !document.querySelector('base[target]')) { var bs = document.createElement('base'); bs.setAttribute('target', '_blank'); document.head.appendChild(bs); }
+  // the Current state picture's ratio, from its own width and height, for the style's 880 px cap (its box keeps its size while it loads)
+  var still = root.querySelector('.av-still'), sw = still ? +still.getAttribute('width') : 0, sh = still ? +still.getAttribute('height') : 0;
+  if (sw > 0 && sh > 0) still.style.setProperty('--av-ar', String(sw / sh));
+  /*<av-embed>*/
+  // the full page's address, relative to this one: the same file, the query without its embed parameter, the anchor kept
+  function archiveHref(path, search, hash) {
+    var file = String(path || '').split('/').pop() || './';
+    var q = String(search || '').replace(/^\?/, '').split('&').filter(function (kv) { return kv && !/^embed(=|$)/.test(kv); });
+    return file + (q.length ? '?' + q.join('&') : '') + (hash || '');
+  }
+  // the height the host is told: a whole number of px, clamped to 200-2400
+  function clampHeight(px) { return Math.min(2400, Math.max(200, Math.ceil(+px) || 0)); }
+  /*</av-embed>*/
+  function out(a) {   // a link that leaves the frame
+    var rel = a.getAttribute('rel') || '';
+    if (a.getAttribute('target') !== '_blank') a.setAttribute('target', '_blank');
+    if (!/(^|\s)noopener(\s|$)/.test(rel)) a.setAttribute('rel', (rel ? rel + ' ' : '') + 'noopener');
+  }
+  function outAll(n) { if (n.querySelectorAll) [].forEach.call(n.querySelectorAll('a[href]'), out); }
+  var id = root.getAttribute('data-av-id') || '', last = -1, timer = null, box, a, at, n;
+  // (1) the full page: under the viewer's lines (the p.s lines right after it), else right after the viewer
+  box = document.createElement('div'); box.className = 'av-embed-open';
+  a = document.createElement('a'); a.setAttribute('href', archiveHref(location.pathname, location.search, location.hash));
+  a.textContent = 'Open in the preservation archive ↗'; out(a); box.appendChild(a);
+  for (at = root, n = root.nextElementSibling; n && n.tagName === 'P' && /(^|\s)s(\s|$)/.test(n.className); n = n.nextElementSibling) at = n;
+  at.parentNode.insertBefore(box, at.nextSibling);
+  // (2) every link out of the frame: those on the page, those the viewer adds later, and any clicked
+  outAll(document);
+  if (window.MutationObserver && document.body) new MutationObserver(function (ms) {
+    ms.forEach(function (m) { [].forEach.call(m.addedNodes || [], function (x) { if (x.nodeType !== 1) return; if (x.tagName === 'A' && x.hasAttribute('href')) out(x); outAll(x); }); });
+  }).observe(document.body, { childList: true, subtree: true });
+  document.addEventListener('click', function (e) { var t = e.target, l = t && t.closest ? t.closest('a[href]') : null; if (l) out(l); }, true);
+  // (3) the height, in a frame only (never a height in vh on this page: the host sets the frame's height from it, see the style)
+  if (window.parent === window) return;
+  function post(force) {
+    var h = clampHeight(de.getBoundingClientRect().height);
+    if (!force && h === last) return;
+    last = h;
+    try { window.parent.postMessage({ type: 'av-embed-height', id: id, height: h }, '*'); } catch (e) { /* a host that cannot be told */ }
+  }
+  function soon() { if (timer === null) timer = setTimeout(function () { timer = null; post(false); }, 40); }
+  post(true);
+  window.addEventListener('load', function () { post(true); });
+  window.addEventListener('resize', soon);
+  document.addEventListener('load', soon, true);   // an image arriving (a picture without its size changes the height)
+  if (window.ResizeObserver && document.body) new window.ResizeObserver(soon).observe(document.body);
+  else if (window.MutationObserver && document.body) new MutationObserver(soon).observe(document.body, { childList: true, subtree: true, attributes: true });
+})();
 /* Async Art viewer - the archive site's Async Art pages and Pinwatch's token page (the collector's request of 22 Sep 2026).
    Default: the static strip. Modes for a work that changes with the time of day:
      Live      - the state for the current time; it changes on its own at each boundary ("next change in 23 min"); the Master's

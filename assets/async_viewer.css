@@ -91,3 +91,31 @@ html.av-framed,html.av-framed body{overflow:hidden}
 .lw-top{font-size:13px;margin:10px 0 0}
 @media (max-width:640px){.aw-grid{grid-template-columns:1fr}.av-ll ol,.av-shl{columns:1}}
 @media (prefers-reduced-motion:reduce){.av-img,.av-prog-bar i{transition:none}}
+/* Embed view (25 Sep 2026): a work's page opened by a gallery in an iframe as async/<id>.html?embed=1. async_viewer.js's first block
+   marks such a page html.av-embed (a work's own page only), and every rule here is keyed on that class: a page without embed=1 is
+   exactly as before. Hidden: the site's tabs, the way back (the page's first line), the files list and everything after it (the
+   notes, the links line, the footer), and any other line after the viewer that is not one of its captions. Kept: the title and the
+   by-line (compact), the artist's line on how the work changes, the viewer (its buttons, the picture or stage) and every line it shows.
+   The stage fits the frame's width and takes no height from the frame: no vh here, because the host sets the frame's height from the
+   page's own; a stable scrollbar gutter, so a scrollbar that comes and goes cannot change the width and the height with it.
+   Instead of the full page's cap (a share of the window's height), a fixed one: the viewer's stage and its Current state picture
+   are at most 880 px high, each by its width capped at 880 px times its own ratio (the stage's ratio is the viewer's; the picture's
+   is set by async_viewer.js's first block from the picture's width and height), so the ratio stays exact, the picture's box has its
+   size before the image arrives, and the two show a work at about the same size. Frame (the viewer's overlay, added at the end of
+   the body) is never hidden here and keeps its own size (the cap is scoped to the viewer, .av-detail). */
+html.av-embed{scrollbar-gutter:stable}
+html.av-embed,html.av-embed body{background:#fff}
+html.av-embed body{max-width:none;padding:8px 10px 10px}
+html.av-embed nav.tabs,html.av-embed body>p:first-of-type,html.av-embed body>p:last-of-type,
+html.av-embed body>.av~h2,html.av-embed body>.av~h2~*:not(.av-frame),html.av-embed body>.av~p:not(.s){display:none}
+html.av-embed h1{font-size:18px;line-height:1.3;margin:0 0 2px;overflow-wrap:anywhere}
+html.av-embed h1+p.s{font-size:12px;margin:0 0 4px}
+html.av-embed h1+p.s+p:not(.s){font-size:12.5px;margin:0 0 4px;color:#444}
+html.av-embed .av-detail{max-width:none}
+html.av-embed .av-stage{max-height:none}
+html.av-embed .av-detail .av-stage{max-width:calc(880px * var(--av-ar,1))}
+html.av-embed .av-detail .av-still{max-width:min(100%,calc(880px * var(--av-ar,1000)))}
+html.av-embed .av-try,html.av-embed .av-opt{white-space:normal}
+html.av-embed select{max-width:100%}
+html.av-embed .av-detail~p.s{margin:4px 0}
+html.av-embed .av-embed-open{margin:8px 0 0;font-size:12.5px}
