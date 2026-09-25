@@ -12,7 +12,12 @@
    (2) every link opens outside the frame (target=_blank rel=noopener): those on the page, those the viewer adds later, any clicked;
    (3) in a frame only (window.parent !== window), the page's height for the host to size its frame, and nothing else:
        window.parent.postMessage({type: 'av-embed-height', id: '<the Master id>', height: <whole px, clamped to 200-2400>}, '*')
-       at the start, on load, on resize and whenever the layout changes (ResizeObserver).
+       at the start, on load, on resize and whenever the layout changes (ResizeObserver on <html> and <body>). The height (fix of
+       25 Sep, after the live check saw the last line cut): Math.ceil of the largest of <html>'s scrollHeight, <html>'s box height and
+       <body>'s scrollHeight, plus <body>'s bottom margin - <html>'s scrollHeight counted only when the page overflows the frame (it is
+       never less than the frame's own height, so counted always it would let the frame grow but never shrink), or once it has set
+       the height (review of 25 Sep: something sticking out below <html>'s box - none of today's pages has one - would otherwise swing
+       the frame between two heights for ever; the price: such a page keeps that height until its own box grows past it).
    Nothing is fetched here and no message is read: there is no 'message' listener in this file. The viewer below runs as on the full
    page (the A+B loading and fallback rules, one viewer per page).
    Known trade-off: a deferred script cannot mark the page before its first paint, so the full page's chrome may show for a moment
@@ -38,6 +43,14 @@
   }
   // the height the host is told: a whole number of px, clamped to 200-2400
   function clampHeight(px) { return Math.min(2400, Math.max(200, Math.ceil(+px) || 0)); }
+  // the height the page needs, in px (25 Sep, after the live check saw the last line cut): the largest of <html>'s scrollHeight (sh),
+  // its box height (box) and <body>'s scrollHeight (bsh), plus <body>'s bottom margin (mb). sh is never less than the frame's own
+  // height (ch, <html>'s clientHeight): it counts when it passes it (the page overflows the frame), else the frame could grow but
+  // never shrink again (and a body margin would grow it at every message) - and, once sh has set the height (held), also while it
+  // equals it: something sticks out below <html>'s box, and without held the frame would swing between the two heights for ever
+  function needHeight(sh, ch, box, bsh, mb, held) { return Math.ceil(Math.max(held || +sh > +ch ? +sh || 0 : 0, +box || 0, +bsh || 0) + (+mb || 0)); }
+  // held for the next measurement: sh set the height (it passes the page's own heights by more than 1 px, the rounding)
+  function heldBy(need, box, bsh, mb) { return need > needHeight(0, 0, box, bsh, mb) + 1; }
   /*</av-embed>*/
   function out(a) {   // a link that leaves the frame
     var rel = a.getAttribute('rel') || '';
@@ -45,7 +58,7 @@
     if (!/(^|\s)noopener(\s|$)/.test(rel)) a.setAttribute('rel', (rel ? rel + ' ' : '') + 'noopener');
   }
   function outAll(n) { if (n.querySelectorAll) [].forEach.call(n.querySelectorAll('a[href]'), out); }
-  var id = root.getAttribute('data-av-id') || '', last = -1, timer = null, box, a, at, n;
+  var id = root.getAttribute('data-av-id') || '', last = -1, held = false, timer = null, box, a, at, n;
   // (1) the full page: under the viewer's lines (the p.s lines right after it), else right after the viewer
   box = document.createElement('div'); box.className = 'av-embed-open';
   a = document.createElement('a'); a.setAttribute('href', archiveHref(location.pathname, location.search, location.hash));
@@ -61,7 +74,12 @@
   // (3) the height, in a frame only (never a height in vh on this page: the host sets the frame's height from it, see the style)
   if (window.parent === window) return;
   function post(force) {
-    var h = clampHeight(de.getBoundingClientRect().height);
+    var b = document.body, mb = 0;
+    try { mb = b ? parseFloat(window.getComputedStyle(b).marginBottom) : 0; } catch (e) { mb = 0; }
+    var rsh = de.scrollHeight, bx = de.getBoundingClientRect().height, bsh = b ? b.scrollHeight : 0;
+    var need = needHeight(rsh, de.clientHeight, bx, bsh, mb, held);
+    held = heldBy(need, bx, bsh, mb);
+    var h = clampHeight(need);
     if (!force && h === last) return;
     last = h;
     try { window.parent.postMessage({ type: 'av-embed-height', id: id, height: h }, '*'); } catch (e) { /* a host that cannot be told */ }
@@ -71,7 +89,7 @@
   window.addEventListener('load', function () { post(true); });
   window.addEventListener('resize', soon);
   document.addEventListener('load', soon, true);   // an image arriving (a picture without its size changes the height)
-  if (window.ResizeObserver && document.body) new window.ResizeObserver(soon).observe(document.body);
+  if (window.ResizeObserver && document.body) { var ro = new window.ResizeObserver(soon); ro.observe(de); ro.observe(document.body); }   // <html> and <body>
   else if (window.MutationObserver && document.body) new MutationObserver(soon).observe(document.body, { childList: true, subtree: true, attributes: true });
 })();
 /* Async Art viewer - the archive site's Async Art pages and Pinwatch's token page (the collector's request of 22 Sep 2026).
