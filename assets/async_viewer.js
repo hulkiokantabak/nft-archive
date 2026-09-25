@@ -1184,7 +1184,7 @@
     this.stage.box.hidden = false; this.stage.ph.hidden = true;
     cw = (m.shuffle && m.shuffle.canvas) || [(m.states[0] || {}).w, (m.states[0] || {}).h];
     this.stage.ratio(cw[0], cw[1]);
-    if (!this.badge) { this.badge = el('div', { 'class': 'av-badge', hidden: '', text: SHUFFLE_CAPTION }); this.stage.box.appendChild(this.badge); }
+    // 25 Sep: no caption drawn ON the picture (it covered the image); the caption below it (av-shcap) says the same
     this.stage.msg.textContent = 'loading layer images…';
     pb = el('button', { type: 'button', 'class': 'av-play', 'aria-pressed': 'false', text: '▶ shuffle' });
     pb.addEventListener('click', function () { if (self.shuffler && self.shuffler.playing) self.shufflePause(); else self.shufflePlay(); });
@@ -1194,11 +1194,12 @@
     this.ctl.appendChild(pb); this.ctl.appendChild(nb); this.ctl.appendChild(this.smsg);
     if (!auto()) this.ctl.appendChild(el('span', { 'class': 'av-note', text: 'it changes on its own only once you press ▶ shuffle (your device asks for reduced motion)' }));
     this.spb = pb;
+    if (this.shCap && this.shCap.parentNode) this.shCap.parentNode.removeChild(this.shCap);
     this.shCap = el('b', { 'class': 'av-shcap', hidden: '', text: SHUFFLE_CAPTION });   // B2: every shuffled picture carries it
     this.shList = el('ol', { 'class': 'av-shl', hidden: '', 'aria-label': 'the option each layer shows' });
     n = combinations(m.layers);
     per = m.layers.filter(function (L) { return L.control === 'lever'; }).map(function (L) { return leverChoices(L).length; });
-    this.cap.appendChild(this.shCap); this.cap.appendChild(this.shList);
+    this.body.insertBefore(this.shCap, this.prog); this.cap.appendChild(this.shList);   // the caption first, directly under the picture (review of 25 Sep)
     this.cap.appendChild(el('div', { 'class': 'av-shn', text: fmtCount(n) + ' possible combinations (' + per.join(' × ') + ': the options of its ' + per.length + ' lever layer' + (per.length === 1 ? '' : 's') + ', multiplied)' }));
     this.root.setAttribute('data-av-combinations', String(n));
     this.shufflePreload();
@@ -1230,8 +1231,7 @@
   Viewer.prototype.leaveShuffle = function () {   // back to Current state (or the layered view): the Shuffle stops; requests sent run on
     if (this.shuffler) this.shuffler.pause();
     this.shuffler = null; this.combo = null; this.shufflePreloading = false;
-    if (this.badge && this.badge.parentNode) this.badge.parentNode.removeChild(this.badge);
-    this.badge = null;
+    if (this.shCap && this.shCap.parentNode) this.shCap.parentNode.removeChild(this.shCap);
     this.stage.hideCanvas(); this.stage.box.hidden = false; this.stage.msg.textContent = '';
     ['data-av-shuffle', 'data-av-combo', 'data-av-combinations', 'data-av-hold', 'data-av-playing'].forEach(function (a) { this.root.removeAttribute(a); }, this);
     (this.shuffleFiles || []).forEach(function (f) { QUEUE.drop(f); });
@@ -1294,7 +1294,7 @@
       if (x.fixed) li.appendChild(el('span', { 'class': 's', text: ' (fixed)' }));
       self.shList.appendChild(li);
     });
-    this.badge.hidden = false; this.shCap.hidden = false; this.shList.hidden = false;
+    this.shCap.hidden = false; this.shList.hidden = false;
     this.root.setAttribute('data-av-combo', c.join(','));
     this.root.setAttribute('data-av-shuffles', String(this.shuffler.shown));
     nd = c.filter(function (k, j) { return !/^https?:\/\//i.test(self.layerFile(j, k).from); }).length;
