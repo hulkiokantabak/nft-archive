@@ -31,8 +31,10 @@
 /* B (24 Sep): a lever work's Current state line under its still, and the Shuffle: the caption on the picture, the option each layer
    shows, the number of possible combinations; a work not shuffled shows its reason */
 .av-cur{margin:3px 0 0;font-size:12px;line-height:1.4;color:#444}.av-cur[hidden]{display:none}
-/* review of 25 Sep: while Shuffle runs, the Current state picture gives way (.av-still's display:block would otherwise override [hidden]) */
-.av[data-av-mode="shuffle"] .av-still[hidden]{display:none}
+/* open item 8, decided 26 Sep (option B): the phase strip / Current state picture shows only where the script leaves it shown - it
+   gives way whenever the script hides it (Live, Slideshow, Shuffle), on async.html's cards too (.av-still's display:block would
+   otherwise override [hidden]; until 26 Sep only Shuffle had this rule) */
+.av-still[hidden]{display:none}
 .av-shcap[hidden],.av-shl[hidden]{display:none}
 .av-shcap{display:block;color:#8a3a00}
 .av-shl{margin:3px 0 3px 20px;padding:0;columns:2 180px;column-gap:18px}
@@ -86,10 +88,55 @@ html.av-framed,html.av-framed body{overflow:hidden}
 .lw-how>summary{cursor:pointer;font-weight:600;color:#0645ad}
 .lw-how[open]>summary{margin-bottom:6px}
 .aa.lw{margin-top:18px}
-.aa.lw>h2{font-size:20px;margin:22px 0 10px;scroll-margin-top:8px}
+.aa.lw>h2,.aa.lw>.lw-grp>h2{font-size:20px;margin:22px 0 10px;scroll-margin-top:8px}
 .lw-top{font-size:13px;margin:10px 0 0}
 @media (max-width:640px){.aw-grid{grid-template-columns:1fr}.av-ll ol,.av-shl{columns:1}}
 @media (prefers-reduced-motion:reduce){.av-img,.av-prog-bar i{transition:none}}
+/* async.html's first choice (mobile note of 26 Sep): the creator cards (name, number of works, one small preview), then one creator's
+   works at a time, with filters by kind. html.lw-js (the page's first line, where the viewer's script can run) hides the groups until
+   one is chosen: async_viewer.js marks the chosen group lw-on; a group whose heading or card is the address's anchor (:target: a
+   creator's #hulki-okan-tabak, a work's #w<id>) shows by the style alone, before the script has run. Two rules, not one list: a
+   browser without :has() drops only its own rule. Without the script the page is the one long page it was */
+.lw-pick{margin:4px 0 14px}
+.lw-ask{margin:0 0 6px;font-size:13px;color:#444}
+.lw-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;max-width:780px}
+.lw-card{display:flex;flex-direction:column;gap:1px;min-width:0;padding:8px;border:1px solid #e5e5e5;border-radius:8px;background:#fff;color:#1f2328;text-decoration:none}
+.lw-card:hover{border-color:#0645ad;text-decoration:none}
+.lw-card:focus-visible{outline:2px solid #0645ad;outline-offset:2px}
+.lw-card[aria-current]{border-color:#1f2933;box-shadow:inset 0 0 0 1px #1f2933}
+.lw-prev{display:block;width:100%;height:auto;aspect-ratio:2;object-fit:cover;margin:0 0 5px;border-radius:4px;background:#f2f2f2}
+.lw-name{font-weight:600;color:#0645ad;overflow-wrap:anywhere}
+.lw-n{font-size:12px;color:#57606a}
+.lw-kinds{display:flex;flex-wrap:wrap;gap:6px 8px;margin:-2px 0 12px}
+.lw-kinds[hidden]{display:none}
+.lw-kinds button{font:inherit;font-size:12.5px;line-height:18px;padding:3px 11px;border:1px solid #c3c8ce;border-radius:14px;background:#fff;color:#1f2328;cursor:pointer}
+.lw-kinds button:hover{border-color:#0645ad}
+.lw-kinds button[aria-pressed="true"]{background:#1f2933;border-color:#1f2933;color:#fff}
+.lw-kinds button[aria-pressed="true"] .s{color:#d0d7de}
+.lw-kinds button:focus-visible{outline:2px solid #0645ad;outline-offset:1px}
+.aw.lw-off{display:none}
+html.lw-js .lw-grp{display:none}
+html.lw-js .lw-grp.lw-on{display:block}
+html.lw-js .lw-grp:has(:target){display:block}
+@media (max-width:640px){.lw-cards{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.lw-card{padding:5px}.lw-name{font-size:13px;line-height:1.25}}
+/* tap to advance (mobile note of 26 Sep): the stage takes a click - a tap, or Enter / Space once focused - for the next phase (Live,
+   Slideshow), another combination (Shuffle) or the next layer (the layered view); a one-time hint under the picture says so. No
+   touch handler: touch-action:manipulation keeps scrolling and pinch-zoom (only the double-tap zoom goes, and its delay) */
+.av-stage.av-tap{cursor:pointer;touch-action:manipulation}
+.av-stage.av-tap:focus-visible,.av-still[tabindex]:focus-visible{outline:2px solid #0645ad;outline-offset:2px}
+.av-hint,.av-curhint,.av-lcap{margin:3px 0 0;font-size:12px;line-height:1.4;color:#57606a}
+.av-hint[hidden],.av-curhint[hidden],.av-lcap[hidden]{display:none}
+.av-hint:empty,.av-curhint:empty,.av-lcap:empty{margin:0}
+/* Shuffle and the layered view at most 880 px wide, as a lever work's Current state picture (a large screen; the stage no wider
+   than the 80vh cap allows at its ratio, so a tall work gets no grey bars). The embed view's own caps (below) are more specific */
+.av-stage.av-w880{max-width:min(880px,calc(80vh * var(--av-ar,1)))}
+.av[data-av-lever="1"]>.av-still{max-width:min(100%,880px)}
+/* 26 Sep: the Current state picture takes the stage's cap, min(880px, 80vh x its ratio) - max-height 80vh on the image (its ratio kept,
+   width:auto) - so a portrait (#1951) is the same size in Current state, Shuffle and Layers and fits one screen on desktop. Full page
+   only: the embed view keeps its own fixed 880 px cap (no vh inside a frame whose height follows the page). */
+html:not(.av-embed) .av[data-av-lever="1"]>.av-still{max-height:80vh;width:auto}
+/* Shuffle while its layer images load: the Current state picture in the stage (its placeholder), under the 'loading' note */
+.av-ph.av-cover{background-size:contain;background-position:center}
 /* Embed view (25 Sep 2026): a work's page opened by a gallery in an iframe as async/<id>.html?embed=1. async_viewer.js's first block
    marks such a page html.av-embed (a work's own page only), and every rule here is keyed on that class: a page without embed=1 is
    exactly as before. Hidden: the site's tabs, the way back (the page's first line), the files list and everything after it (the

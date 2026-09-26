@@ -652,6 +652,22 @@
     this.canvas = null;
     if (this.imgs[this.front].getAttribute('src')) this.imgs[this.front].className = 'av-img on';
   };
+  // Shuffle while its layer images load (mobile note of 26 Sep): the Current state picture fills the stage (contained) instead of an
+  // empty grey box - drawn by the placeholder div from the still's own address (no new file, no second <img>); uncover() takes it away
+  Stage.prototype.cover = function (url, label) {
+    var s = this.ph.style;
+    if (!url) return;
+    s.left = '0'; s.top = '0'; s.width = '100%'; s.height = '100%'; s.backgroundPosition = ''; s.backgroundSize = '';
+    s.backgroundImage = 'url("' + String(url).replace(/["\\]/g, '\\$&') + '")';
+    this.ph.className = 'av-ph av-cover'; this.ph.hidden = false;
+    if (label) { this.ph.setAttribute('role', 'img'); this.ph.setAttribute('aria-label', label); }   // the picture's own words, not only a background
+  };
+  Stage.prototype.covered = function () { return this.ph.className.indexOf('av-cover') >= 0; };
+  Stage.prototype.uncover = function () {
+    if (!this.covered()) return;
+    this.ph.className = 'av-ph'; this.ph.hidden = true; this.ph.style.backgroundImage = '';
+    this.ph.removeAttribute('role'); this.ph.removeAttribute('aria-label');
+  };
   function layersCanvas(ims, label) {   // the layers drawn in order on one canvas, as our composites of 22 Sep: each on the whole canvas,
     var ref = ims[0], sc, cw, ch, cv, cx, i, w, h;   // transparent areas on white; layer files of different shapes are refused
     for (i = 1; i < ims.length; i++) if (ims[i].naturalWidth > ref.naturalWidth) ref = ims[i];
@@ -706,12 +722,71 @@
     this.prog = el('div', { 'class': 'av-prog', hidden: '' });   // A2: the thin bar under the picture while the states load
     this.srcLine = el('div', { 'class': 'av-src', hidden: '' });   // A5: what the picture is - a display copy, or the original - and the original's link
     this.stage.onshow = function (f, key) { self.label(f, key); };
+    // the two lines below stay rendered and change only their text (empty: nothing shows), so a screen reader hears each change
+    this.lcap = el('div', { 'class': 'av-lcap', 'aria-live': 'polite' });   // the layered view, a tap at a time: which layers the picture stacks
+    this.hint = el('div', { 'class': 'av-hint', 'aria-live': 'polite' });   // the one-time hint: "Tap the image for ..."
     this.body.appendChild(this.stage.box); this.body.appendChild(this.prog); this.body.appendChild(this.srcLine);
-    this.body.appendChild(this.cap); this.body.appendChild(this.ctl);
+    this.body.appendChild(this.lcap); this.body.appendChild(this.hint); this.body.appendChild(this.cap); this.body.appendChild(this.ctl);
     this.panel = el('div', { 'class': 'av-layers', hidden: '' });
     this.root.appendChild(this.bar); this.root.appendChild(this.body); this.root.appendChild(this.panel);
     if (this.lever) this.buildCur();
+    // tap to advance (mobile note of 26 Sep): a click on the picture - a tap, or Enter / Space while it has the focus - shows the next
+    // phase, another combination or the next layer (tapKind). The click event only: no touchstart, no preventDefault on a touch, so
+    // scrolling and pinch-zoom stay the browser's. Here, not in Stage: Frame's stage leaves on any click (its overlay's own rule)
+    this.stage.box.addEventListener('click', function () { if (self.tapKind()) self.tap(); });
+    this.stage.box.addEventListener('keydown', function (e) {
+      if (e.target !== self.stage.box || !activates(e) || !self.tapKind()) return;
+      e.preventDefault(); self.tap();   // Space would scroll the page
+    });
   };
+  function activates(e) { return e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar'; }
+  // what a tap on the picture does now: 'layer' (the layered view of several layers), 'combo' (Shuffle, while it can), 'phase' (Live
+  // or Slideshow of a work that changes with the time of day), or '' (nothing: Strip, Current state, Frame, a work not shuffled)
+  Viewer.prototype.tapKind = function () {
+    if (this.frameStage || !this.m || this.body.hidden || this.stage.box.hidden) return '';
+    if (this.layered && (this.m.layers || []).length > 1) return 'layer';
+    if (this.mode === 'shuffle') return this.shuffler && !this.shuffler.stopped && !this.shStopped ? 'combo' : '';
+    if (this.timed && (this.mode === 'live' || this.mode === 'slideshow') && this.m.states && this.m.states.length > 1) return 'phase';
+    return '';
+  };
+  var TAP = { phase: ['the next phase', 'Tap the image for the next phase'], combo: ['another combination', 'Tap the image for another combination'],
+              layer: ['the next layer', 'Tap the image for the next layer'] };
+  var HINTED = {};   // a hint once per page, whatever the storage says (no storage: once per visit)
+  // the stage as the tap finds it: focusable, labelled and pointer-shaped only while a tap does something; Shuffle and the layered view
+  // at most 880 px wide (the style's av-w880); the one-time hint the first time each kind of tap is offered (remembered in this browser)
+  Viewer.prototype.syncTap = function () {
+    var k = this.tapKind(), b = this.stage.box, t = TAP[k];
+    b.className = 'av-stage' + (t ? ' av-tap' : '') + (this.mode === 'shuffle' || this.layered ? ' av-w880' : '');
+    if (t) { b.setAttribute('tabindex', '0'); b.setAttribute('role', 'group'); b.setAttribute('aria-label', 'The picture: tap it, or press Enter, for ' + t[0]); }
+    else { b.removeAttribute('tabindex'); b.removeAttribute('role'); b.removeAttribute('aria-label'); }
+    if (this.hintKind && this.hintKind !== k) { this.hint.textContent = ''; this.hintKind = null; }
+    if (t && !this.hintKind && !HINTED[k] && !sget('hint.' + k)) {
+      HINTED[k] = true; sset('hint.' + k, '1');
+      this.hint.textContent = t[1]; this.hintKind = k;
+    }
+    if (!(this.layered && this.layerTop !== null && this.layerTop !== undefined)) this.lcap.textContent = '';
+  };
+  // the first hour after h whose state differs: the next phase (an hourly work: the next hour); the same rule as nextChange
+  function nextPhase(m, h) {
+    var hs = m.hour_state, k;
+    if (!hs) return (h + 1) % 24;
+    for (k = 1; k < 24; k++) if (hs[(h + k) % 24] !== hs[h]) return (h + k) % 24;
+    return (h + 1) % 24;
+  }
+  Viewer.prototype.tap = function () {
+    var k = this.tapKind(), n;
+    if (this.hintKind) this.hint.textContent = '';   // the hint has done its work
+    if (k === 'layer') {   // one more layer each tap (layer 1, layers 1-2, ...), then all of them again
+      n = this.m.layers.length;
+      this.layerTop = this.layerTop === null || this.layerTop === undefined ? 0 : this.layerTop + 1 >= n - 1 ? null : this.layerTop + 1;
+      this.compose();
+    } else if (k === 'combo') this.shuffler.another();   // the same as the 'another combination' button (paused stays paused)
+    else if (k === 'phase') {   // the next phase, and no playing on its own: Live gives way to the Slideshow, paused there
+      if (this.mode === 'live') this.choose('slideshow', false, nextPhase(this.m, this.curHour()));
+      else { if (this.playing) this.pause(); this.slide(nextPhase(this.m, this.pos)); }
+    }
+  };
+  function composite(s) { return /^our composite/.test((s && s.file) || '') ? ' (our composite)' : ''; }   // a state image we composed (85 of 2,091; the others are the Master's own files)
   // B1: under a lever work's still (our composite), what it is: "Current state", the levers as read on-chain on the snapshot's date. On
   // a work's own page the still is the state's display copy: its label and the original's link too (the page's inline data, no request)
   Viewer.prototype.buildCur = function () {
@@ -725,9 +800,22 @@
       if (s0 && s0.cid) { this.curLine.appendChild(document.createTextNode(' · ')); this.curLine.appendChild(el('a', { href: GATEWAYS[0] + s0.cid, rel: 'noopener', text: 'open the original' })); }
     }
     this.root.insertBefore(this.curLine, this.bar);
+    // a tap on the Current state picture changes nothing - it is the chain's state; it says where the combinations are instead (mobile
+    // note of 26 Sep). Focusable, and Enter / Space do the same; the picture keeps its own alt text ("... (our composite)")
+    this.curHint = el('div', { 'class': 'av-curhint', 'aria-live': 'polite' });   // rendered and empty until a tap: its text is what is announced
+    this.root.insertBefore(this.curHint, this.bar);
+    if (this.still && this.still.tagName === 'IMG') {
+      var self = this, still = this.still, say = function () { self.curHint.textContent = 'Use Shuffle to explore combinations'; };
+      still.setAttribute('tabindex', '0');
+      still.addEventListener('click', say);
+      still.addEventListener('keydown', function (e) { if (e.target === still && activates(e)) { e.preventDefault(); say(); } });
+    }
     this.syncCur();
   };
-  Viewer.prototype.syncCur = function () { if (this.curLine) this.curLine.hidden = !this.still || !!this.still.hidden; };
+  Viewer.prototype.syncCur = function () {
+    if (this.curLine) this.curLine.hidden = !this.still || !!this.still.hidden;
+    if (this.curHint && (!this.still || this.still.hidden || this.mode !== 'strip')) this.curHint.textContent = '';
+  };
   Viewer.prototype.ensure = function (cb) {
     var self = this;
     if (this.m) { cb(); return; }
@@ -738,13 +826,14 @@
     });
   };
   Viewer.prototype.stop = function () { clearTimeout(this.timer); this.timer = null; this.playing = false; if (this.player) this.player.pause(); if (this.shuffler) this.shuffler.pause(); };
-  Viewer.prototype.choose = function (mode, user) {
+  // hour (a tap in Live, 26 Sep): the Slideshow opens at that hour, paused
+  Viewer.prototype.choose = function (mode, user, hour) {
     var self = this, k;
     if (!this.btn[mode] && mode !== 'strip') mode = 'strip';
     if (mode === 'frame') { this.ensure(function () { self.openFrame(false); }); return; }
     if (this.mode === 'shuffle') this.leaveShuffle();
     if (mode === 'shuffle' && this.layered) { this.layered = false; this.preview = {}; this.composedKey = null; this.stage.hideCanvas(); if (!this.panel.hidden) this.renderPanel(); }
-    this.stop(); this.mode = mode;
+    this.stop(); this.mode = mode; this.layerTop = null;
     if (user) sset('mode.' + this.id, mode);
     for (k in this.btn) if (Object.prototype.hasOwnProperty.call(this.btn, k)) this.btn[k].setAttribute('aria-pressed', String(k === mode));
     this.root.setAttribute('data-av-mode', mode);
@@ -753,17 +842,19 @@
       this.body.hidden = true; this.ctl.textContent = '';
       if (this.still) this.still.hidden = false;
       this.unload();
-      this.syncPanel(); this.syncCur();
+      this.syncPanel(); this.syncCur(); this.syncTap();
       return;
     }
+    this.syncCur(); this.syncTap();
     this.ensure(function () {
       if (self.mode !== mode) return;
-      if (mode === 'shuffle') { self.startShuffle(); self.syncCur(); return; }
+      if (mode === 'shuffle') { self.startShuffle(); self.syncCur(); self.syncTap(); return; }
       if (!self.m.states || !self.m.states.length) { self.note.textContent = 'No state images for this layout.'; return; }
       self.body.hidden = false;
       if (self.still && !self.keepStill) self.still.hidden = true;
       self.stage.placeholder(self.m, 0);
-      if (mode === 'live') self.startLive(); else self.startSlides(user);
+      if (mode === 'live') self.startLive(); else self.startSlides(user, hour);
+      self.syncTap();
     });
   };
 
@@ -878,7 +969,7 @@
     if (!this.frameStage) {
       this.cap.textContent = '';
       this.cap.appendChild(el('b', { text: s.label }));
-      this.cap.appendChild(document.createTextNode(' · ' + (m.hour_state ? ranges(s.hours) + ' ' + (this.local ? '(your time)' : '(' + c.zone + ')') : 'all day')));
+      this.cap.appendChild(document.createTextNode(' · ' + (m.hour_state ? ranges(s.hours) + ' ' + (this.local ? '(your time)' : '(' + c.zone + ')') : 'all day') + composite(s)));
       this.cap.appendChild(el('br'));
       this.cap.appendChild(document.createTextNode('now ' + pad(c.h) + ':' + pad(c.mi) + ' ' + (this.local ? 'your local time' : 'artwork time, ' + c.zone) + (nc ? ' · next change in ' + fmtIn(nc.ms) + ' (' + m.states[nc.to].label + ')' : '')));
       if (!auto()) this.cap.appendChild(el('span', { 'class': 'av-note', text: ' · changes on its own only if you turn it on' }));
@@ -920,7 +1011,7 @@
     this.root.setAttribute('data-av-hour', String(this.pos));
     this.cap.textContent = '';
     this.cap.appendChild(el('b', { text: s.label }));
-    this.cap.appendChild(document.createTextNode(' · ' + ranges(s.hours) + ' (' + (this.local ? 'your time' : (m.tz && m.tz.label) || 'UTC') + ') · state ' + (i + 1) + ' of ' + m.states.length));
+    this.cap.appendChild(document.createTextNode(' · ' + ranges(s.hours) + ' (' + (this.local ? 'your time' : (m.tz && m.tz.label) || 'UTC') + ') · state ' + (i + 1) + ' of ' + m.states.length + composite(s)));
   };
   // A3: the slideshow's clock (makePlayer) never moves to a state whose image has not loaded and starts once the first two are ready
   Viewer.prototype.play = function () {
@@ -1091,6 +1182,7 @@
     L.options.forEach(function (o, k) { var op = el('option', { value: String(k), text: (o.label || ('value ' + k)) }); if (self.preview[j] === k) op.selected = true; sel.appendChild(op); });
     sel.addEventListener('change', function () {
       if (sel.value === '') delete self.preview[j]; else self.preview[j] = +sel.value;
+      self.layerTop = null;   // a preview shows every layer
       self.renderPanel();
       if (Object.keys(self.preview).length) self.setLayered(true); else if (self.layered) self.compose();
     });
@@ -1111,7 +1203,7 @@
   };
   Viewer.prototype.setLayered = function (on) {
     if (on && this.mode === 'shuffle') this.choose('strip', false);   // the layered view (on-chain values, or a preview) ends the Shuffle
-    this.layered = !!on; this.composedKey = null;
+    this.layered = !!on; this.composedKey = null; this.layerTop = null;
     if (!on) {
       this.preview = {}; (this.frameStage || this.stage).hideCanvas();
       if (this.lastLabel) this.label(this.lastLabel[0], this.lastLabel[1]); else if (this.srcLine) this.srcLine.hidden = true;   // the state image's own label again
@@ -1128,16 +1220,19 @@
       }
     } else if (this.m.states && this.m.states.length) this.showState(this.shown || 0);
     if (!this.panel.hidden) this.renderPanel();
-    this.syncCur();
+    this.syncCur(); this.syncTap();
   };
   Viewer.prototype.layerFile = function (j, k) {   // layer j's option k: its display copy first (A5), then the original on the gateways (O15)
     var o = ((this.m.layers[j] || {}).options || [])[k] || {}, s = (o.display ? [BASE + o.display] : []).concat(gatewaySrcs(o.cid));
     return QUEUE.file(s[0] || ('none:' + this.id + ':l' + j + ':' + k), s);
   };
   Viewer.prototype.compose = function () {
-    var self = this, m = this.m, st = this.frameStage || this.stage, act = this.activeOpts(), fs, key, pv = Object.keys(this.preview).length > 0;
+    var self = this, m = this.m, st = this.frameStage || this.stage, act = this.activeOpts(), fs, key, pv = Object.keys(this.preview).length > 0, top, all;
     fs = m.layers.map(function (L, j) { return self.layerFile(j, L.options[act[j]] ? act[j] : 0); });
-    key = fs.map(function (f) { return f.key; }).join(',');
+    all = fs.length;
+    top = this.layerTop !== null && this.layerTop !== undefined && this.layerTop < all - 1 && st === this.stage ? this.layerTop : null;   // a tap at a time (26 Sep): layers 1 to top+1 only
+    if (top !== null) fs = fs.slice(0, top + 1);
+    key = fs.map(function (f) { return f.key; }).join(',') + (top !== null ? '|' + top : '');
     if (this.composedKey === key) return;
     this.composedKey = key;
     if (this.lvMsg) this.lvMsg.textContent = ' composing from ' + fs.length + ' layer files…';
@@ -1150,6 +1245,13 @@
       nd = fs.filter(function (f) { return !/^https?:\/\//i.test(f.from); }).length;
       self.root.setAttribute('data-av-layered', pv ? 'preview' : 'on');
       self.root.setAttribute('data-av-layer-copies', nd + '/' + fs.length);
+      if (st === self.stage) {   // which layers the picture stacks, while the taps build it up (all of them: no line)
+        self.lcap.textContent = '';
+        if (top !== null) {
+          self.lcap.appendChild(el('b', { text: 'Layer ' + (top + 1) + ' of ' + all }));
+          self.lcap.appendChild(document.createTextNode(': ' + (m.layers[top].label || m.layers[top].id || '') + ' — ' + (top ? 'layers 1–' + (top + 1) + ' stacked' : 'the first layer alone') + ' here from the layer files; tap again for the next'));
+        }
+      }
       if (self.lvMsg) self.lvMsg.textContent = ' composed here from ' + fs.length + ' layer files' + (nd ? ' (' + (nd === fs.length ? 'their' : nd) + ' display copies, resized; the originals are on IPFS)' : '')
         + (pv ? '' : (self.levers().length ? (self.chainState === 'read' ? ' · lever values on-chain now' : ' · lever values from our snapshot of ' + (m.snapshot_date || '')) : ''));
       if (pv && self.lvMsg) self.lvMsg.appendChild(el('span', { 'class': 'av-prev', text: ' · preview — not on-chain' }));
@@ -1164,6 +1266,7 @@
       if (!self.panel.hidden) self.renderPanel();
       if (self.lvMsg) self.lvMsg.textContent = ' A layer file did not load (' + e.message + '); showing the state image instead.';
       if (self.mode === 'strip') { self.body.hidden = true; if (self.still) self.still.hidden = false; self.syncCur(); } else if (m.states && m.states.length) self.showState(self.shown || 0);
+      self.layerTop = null; self.syncTap();
     });
   };
 
@@ -1171,7 +1274,7 @@
   Viewer.prototype.startShuffle = function () {
     var self = this, m = this.m, why = shuffleVerdict(m), pb, nb, n, per, cw;
     this.ctl.textContent = ''; this.cap.textContent = ''; this.srcLine.hidden = true; this.prog.hidden = true;
-    this.body.hidden = false;
+    this.body.hidden = false; this.shStopped = false;
     this.root.setAttribute('data-av-shuffle', why ? 'off' : 'on');
     if (why) {   // B3: not reproduced faithfully (or not by our composites' rules): the reason, and nothing is shuffled
       this.stage.box.hidden = true;
@@ -1186,6 +1289,17 @@
     this.stage.ratio(cw[0], cw[1]);
     // 25 Sep: no caption drawn ON the picture (it covered the image); the caption below it (av-shcap) says the same
     this.stage.msg.textContent = 'loading layer images…';
+    // 26 Sep: meanwhile the Current state picture in the stage, not an empty grey box (the still's own address: no new request); the
+    // Shuffle caption stays hidden until the first combination - this picture is the chain's state, and the note says so
+    if (this.still && this.still.tagName === 'IMG' && (this.still.currentSrc || this.still.getAttribute('src'))) {
+      this.stage.cover(this.still.currentSrc || this.still.src, 'The Current state (our composite), shown while the combinations load');
+      this.stage.msg.textContent = 'loading layer images… · meanwhile the Current state (our composite)';
+      if (this.curLine) {   // and its own line under the picture meanwhile (what it is, the display-copy note, the original's link); showCombo replaces it
+        this.srcLine.textContent = 'Meanwhile, ';
+        [].forEach.call(this.curLine.childNodes, function (x) { self.srcLine.appendChild(x.cloneNode(true)); });
+        this.srcLine.hidden = false;
+      }
+    }
     pb = el('button', { type: 'button', 'class': 'av-play', 'aria-pressed': 'false', text: '▶ shuffle' });
     pb.addEventListener('click', function () { if (self.shuffler && self.shuffler.playing) self.shufflePause(); else self.shufflePlay(); });
     nb = el('button', { type: 'button', 'class': 'av-another', text: 'another combination' });
@@ -1232,7 +1346,7 @@
     if (this.shuffler) this.shuffler.pause();
     this.shuffler = null; this.combo = null; this.shufflePreloading = false;
     if (this.shCap && this.shCap.parentNode) this.shCap.parentNode.removeChild(this.shCap);
-    this.stage.hideCanvas(); this.stage.box.hidden = false; this.stage.msg.textContent = '';
+    this.stage.hideCanvas(); this.stage.uncover(); this.stage.box.hidden = false; this.stage.msg.textContent = '';
     ['data-av-shuffle', 'data-av-combo', 'data-av-combinations', 'data-av-hold', 'data-av-playing'].forEach(function (a) { this.root.removeAttribute(a); }, this);
     (this.shuffleFiles || []).forEach(function (f) { QUEUE.drop(f); });
     this.srcLine.hidden = true; this.prog.hidden = true; this.cap.textContent = ''; this.ctl.textContent = '';
@@ -1271,7 +1385,8 @@
     p.appendChild(el('span', { 'class': 'av-prog-t', text: 'Loading layer images ' + ok + ' of ' + n }));
   };
   Viewer.prototype.shuffleNote = function (k) {
-    if (k === 'stopped') { this.shufflePause(); if (this.spb) this.spb.disabled = true; }   // (pausing clears the note: set it after)
+    if (k === 'stopped') { this.shufflePause(); if (this.spb) this.spb.disabled = true; this.shStopped = true; this.syncTap(); }   // (pausing clears the note: set it after)
+    if (k === 'stopped' && this.stage.covered() && !this.combo) this.stage.msg.textContent = 'Shuffle stopped · this is the Current state (our composite)';   // no combination came: the cover stays, labelled as what it is
     this.root.setAttribute('data-av-hold', k || '');
     if (this.smsg) this.smsg.textContent = k === 'starting' ? 'starts once the first two combinations have loaded…' : k === 'waiting' ? 'waiting for the next combination to load…'
       : k === 'stopped' ? 'Shuffle stopped: a layer’s images did not load from this site or the public IPFS gateways just now.' : '';
@@ -1285,6 +1400,7 @@
       r = layersCanvas(c.map(function (k, j) { return self.layerFile(j, k).result.img; }), (m.title || '') + ' — ' + SHUFFLE_CAPTION + ': ' + text);
     } catch (e) { this.shuffleNote('stopped'); return; }
     this.stage.ratio(r.w, r.h); this.stage.showCanvas(r.cv, true); this.stage.msg.textContent = '';
+    if (REDUCE) this.stage.uncover(); else setTimeout(function () { if (self.combo) self.stage.uncover(); }, 1000);   // the Current state picture goes once the combination has faded in
     this.combo = c;
     this.shList.textContent = '';
     list.forEach(function (x) {
@@ -1344,7 +1460,7 @@
         self.root.setAttribute('data-av-mode', 'slideshow');
         self.body.hidden = false;
         if (self.still && !self.keepStill) self.still.hidden = true;
-        self.startSlides(false, hour);
+        self.startSlides(false, hour); self.syncTap();
         self.reveal();
       });
       return;
@@ -1369,9 +1485,90 @@
     n = (this.root.closest && this.root.closest('.aw, tr')) || this.root;   // the card on async.html, the table row on c/async-art.html
     if (n.scrollIntoView) n.scrollIntoView();
   };
-  function onScreen(n) {
+  function onScreen(n) {   // a work not shown (a creator not chosen on async.html, 26 Sep: display:none) is not on screen - it has no box at all
     var r = n.getBoundingClientRect(), h = window.innerHeight || document.documentElement.clientHeight || 0;
+    if (!n.getClientRects().length) return false;
     return r.bottom >= -200 && r.top <= h + 200;
+  }
+
+  // ---------------------------------------------------------------- async.html: a choice first, one creator at a time, filters by kind
+  // (mobile note of 26 Sep) The page starts with the creator cards. A card, a creator's anchor (#hulki-okan-tabak, #athena-novo,
+  // #mad-monk - the creators' galleries link to them), a work's #w<id> (every work page's way back) or ?w=<id> opens that creator's
+  // group (lw-on; under html.lw-js the style hides the others, so their lazy images are not fetched and no remembered mode starts
+  // there: onScreen); #artists, the tests' #probe=..., no anchor and anything else show the choice alone. Runs before the viewers
+  // start, so ?w= finds its work shown. Only on async.html (the one section with the class lw): c/async-art.html and Pinwatch are left
+  // as they are; and only once the page's first line has marked <html> lw-js (without it, the one long page stays).
+  function landing() {
+    var sec = document.querySelector('#artist-archive.lw'), de = document.documentElement, grps, cards;
+    if (!sec || !/(^|\s)lw-js(\s|$)/.test(de.className)) return;
+    grps = [].slice.call(sec.querySelectorAll('.lw-grp[data-lw]'));
+    cards = [].slice.call(document.querySelectorAll('.lw-card[href]'));
+    function groupOf(n) { return n && n.closest ? n.closest('.lw-grp') : null; }
+    function named() {   // the element the anchor names (a group's heading, a work's card, #artists), or null
+      var h = location.hash || '';
+      return /^#[A-Za-z][\w-]*$/.test(h) ? document.getElementById(h.slice(1)) : null;
+    }
+    function rest() {   // a viewer whose group was closed or whose card was filtered off goes back to rest (its Shuffle, clock and queued files stop)
+      VIEWERS.forEach(function (v) { if (v.mode !== 'strip' && !v.frameStage && v.root && !v.root.getClientRects().length) v.choose('strip', false); });
+    }
+    function open(g) {
+      grps.forEach(function (x) { if (x === g) x.classList.add('lw-on'); else x.classList.remove('lw-on'); });
+      cards.forEach(function (c) { if (g && c.getAttribute('href') === '#' + g.getAttribute('data-lw')) c.setAttribute('aria-current', 'true'); else c.removeAttribute('aria-current'); });
+      de.setAttribute('data-lw-open', g ? g.getAttribute('data-lw') : '');
+      rest();
+    }
+    // the reader's place in a creator's works, kept in this history entry (review of 26 Sep): the page's height changes with the
+    // creator shown, so the browser's own restore on Back / Forward lands on the heading; route() puts the reader back where they were
+    var saveT = null;
+    function place() {
+      var st;
+      try { st = history.state; } catch (e) { return null; }
+      return st && typeof st === 'object' && typeof st.lwY === 'number' && st.lwH === location.hash ? st.lwY : null;
+    }
+    window.addEventListener('scroll', function () {
+      clearTimeout(saveT);
+      saveT = setTimeout(function () {
+        var st, o = {}, k;
+        if (!de.getAttribute('data-lw-open')) return;
+        try {
+          st = history.state;
+          if (st && typeof st === 'object') for (k in st) if (Object.prototype.hasOwnProperty.call(st, k)) o[k] = st[k];
+          o.lwY = Math.round(window.pageYOffset || de.scrollTop || 0); o.lwH = location.hash;
+          history.replaceState(o, '');
+        } catch (e) { /* no history state here: the browser's own restore stands */ }
+      }, 250);
+    }, { passive: true });
+    function route() {
+      var n = named(), w = /^\d+$/.test(Q.w || '') ? document.getElementById('w' + Q.w) : null, g, r, shown, y;
+      g = n ? groupOf(n) : groupOf(w);   // an anchor outside the groups (#artists): the choice, even on a ?w= page
+      shown = !!g && g.getClientRects().length > 0;   // already shown (:has(:target), or open before): the browser's jump stands
+      open(g);
+      y = g ? place() : null;
+      if (y !== null) window.scrollTo(0, y);   // Back / Forward / a reload to this entry: where the reader was
+      else if (g && n && !shown) {   // the anchor on screen: the browser's own jump may have come before its group was shown (or moved since)
+        r = n.getBoundingClientRect();
+        if (r.top < -2 || r.top > (window.innerHeight || de.clientHeight || 0) - 40) n.scrollIntoView();
+      }
+    }
+    grps.forEach(function (g) {   // the kind filters: all, or one kind (the cards of the others hidden)
+      var bar = g.querySelector('.lw-kinds'), aws = [].slice.call(g.querySelectorAll('.aw'));
+      if (!bar) return;
+      bar.hidden = false;
+      bar.addEventListener('click', function (e) {
+        var b = e.target && e.target.closest ? e.target.closest('button[data-lw-kind]') : null, k;
+        if (!b) return;
+        k = b.getAttribute('data-lw-kind') || '';
+        [].forEach.call(bar.querySelectorAll('button[data-lw-kind]'), function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+        aws.forEach(function (a) {
+          var r = a.querySelector('.av[data-av-kind]'), off = !!k && (!r || r.getAttribute('data-av-kind') !== k);
+          if (off) a.classList.add('lw-off'); else a.classList.remove('lw-off');
+        });
+        g.setAttribute('data-lw-kind', k);
+        rest();
+      });
+    });
+    route();
+    window.addEventListener('hashchange', route);
   }
 
   // ---------------------------------------------------------------- find the works on this page
@@ -1379,6 +1576,7 @@
   function mount(t) { var v = new Viewer(t); VIEWERS.push(v); v.start(); return v; }
   function init() {
     var idx = CFG.index || {};
+    landing();
     [].forEach.call(document.querySelectorAll('.av[data-av-id]'), function (root) {
       var id = root.getAttribute('data-av-id'), kind = root.getAttribute('data-av-kind');
       if (kind === null) {   // Pinwatch: a work is shown only when the viewer's data has it
