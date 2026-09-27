@@ -683,6 +683,8 @@
 
   // ---------------------------------------------------------------- one viewer per work
   var TIMED = /hourly|day\/night|four-phase|states/;
+  // sims-09 (27 Sep): below 600 px a time-based work's strip is a thin band (343 x 14 px at 375 px), so a work's own page opens it in Live
+  function phone() { try { return !!(window.matchMedia && window.matchMedia('(max-width: 599px)').matches); } catch (e) { return false; } }
   function Viewer(t) {
     this.root = t.root; this.id = t.id; this.kind = t.kind || ''; this.still = t.still || null; this.detail = t.detail || null;
     this.keepStill = !!t.keepStill; this.m = null; this.mode = 'strip'; this.timer = null; this.playing = false; this.pos = 0;
@@ -699,12 +701,15 @@
     this.root.setAttribute('data-av-state', 'ready');
     this.bar = el('div', { 'class': 'av-bar', role: 'group', 'aria-label': 'Ways to show this work' });
     this.btn = {};
-    if (this.timed) modes = [['strip', 'Strip', 'The distinct states side by side, with their hours (the default)'],
-                             ['live', 'Live', 'The state for the current time; it changes on its own at each boundary'],
-                             ['slideshow', 'Slideshow', 'The distinct states in time order'],
+    // the tooltips in async.html's words (editorial-12, 26 Sep): 'what you see first', 'when the next state begins'
+    this.phoneLive = this.timed && CFG.page === 'detail' && phone()   // sims-09 (27 Sep): Live first on a phone (start)
+      && !(document.documentElement && document.documentElement.classList && document.documentElement.classList.contains('av-embed'));   // never in an embed frame: the galleries' embed view stays as it is (Chat 27 Sep: the embed contract stays closed)
+    if (this.timed) modes = [['strip', 'Strip', 'Every state side by side, with its hours' + (this.phoneLive ? '' : ': what you see first')],
+                             ['live', 'Live', 'The state for the current time; it changes on its own when the next state begins' + (this.phoneLive ? ': what you see first on a phone' : '')],
+                             ['slideshow', 'Slideshow', 'The states in time order'],
                              ['frame', 'Frame', 'Full screen, Live, no controls: for a TV or a digital frame (Esc or a click leaves)']];
-    else if (this.lever) modes = [['strip', 'Current state', 'The levers as read on-chain' + (this.snap ? ' on ' + this.snap : '') + ': our composite (the default)'],
-                                  ['shuffle', 'Shuffle', 'Random combinations of the lever layers, a new one about every 5 s; none of them is the current on-chain state']];
+    else if (this.lever) modes = [['strip', 'Current state', 'The levers as read on-chain' + (this.snap ? ' on ' + this.snap : '') + ' (our composite): what you see first'],
+                                  ['shuffle', 'Shuffle', 'Random combinations of the lever layers, a new one about every 5 s, each captioned “' + SHUFFLE_CAPTION + '”']];   // the caption word for word (editorial-05)
     modes.forEach(function (x) {
       var b = el('button', { type: 'button', 'data-mode': x[0], title: x[2], 'aria-pressed': x[0] === 'strip' ? 'true' : 'false', text: x[1] });
       b.addEventListener('click', function () { self.choose(x[0], true); });
@@ -728,7 +733,12 @@
     this.body.appendChild(this.stage.box); this.body.appendChild(this.prog); this.body.appendChild(this.srcLine);
     this.body.appendChild(this.lcap); this.body.appendChild(this.hint); this.body.appendChild(this.cap); this.body.appendChild(this.ctl);
     this.panel = el('div', { 'class': 'av-layers', hidden: '' });
-    this.root.appendChild(this.bar); this.root.appendChild(this.body); this.root.appendChild(this.panel);
+    // sims-10 (27 Sep): one place for the mode bar in every mode - above the picture. Where the still (the strip, or a lever work's
+    // Current state picture) is inside the viewer, the bar goes before it, so a mode that hides the still (Shuffle; Live and Slideshow
+    // off a work's own page) no longer moves the bar by the picture's height (on a phone about 300 px, under the thumb that pressed it)
+    this.stillIn = !!(this.still && this.still.parentNode === this.root);
+    if (this.stillIn) this.root.insertBefore(this.bar, this.still); else this.root.appendChild(this.bar);
+    this.root.appendChild(this.body); this.root.appendChild(this.panel);
     if (this.lever) this.buildCur();
     // tap to advance (mobile note of 26 Sep): a click on the picture - a tap, or Enter / Space while it has the focus - shows the next
     // phase, another combination or the next layer (tapKind). The click event only: no touchstart, no preventDefault on a touch, so
@@ -799,11 +809,11 @@
       this.curLine.appendChild(document.createTextNode(' · ' + DISPLAY_NOTE));
       if (s0 && s0.cid) { this.curLine.appendChild(document.createTextNode(' · ')); this.curLine.appendChild(el('a', { href: GATEWAYS[0] + s0.cid, rel: 'noopener', text: 'open the original' })); }
     }
-    this.root.insertBefore(this.curLine, this.bar);
+    this.root.insertBefore(this.curLine, this.stillIn ? this.body : this.bar);   // right under the picture it describes (sims-10: the bar is above it)
     // a tap on the Current state picture changes nothing - it is the chain's state; it says where the combinations are instead (mobile
     // note of 26 Sep). Focusable, and Enter / Space do the same; the picture keeps its own alt text ("... (our composite)")
     this.curHint = el('div', { 'class': 'av-curhint', 'aria-live': 'polite' });   // rendered and empty until a tap: its text is what is announced
-    this.root.insertBefore(this.curHint, this.bar);
+    this.root.insertBefore(this.curHint, this.stillIn ? this.body : this.bar);
     if (this.still && this.still.tagName === 'IMG') {
       var self = this, still = this.still, say = function () { self.curHint.textContent = 'Use Shuffle to explore combinations'; };
       still.setAttribute('tabindex', '0');
@@ -1293,7 +1303,8 @@
     // Shuffle caption stays hidden until the first combination - this picture is the chain's state, and the note says so
     if (this.still && this.still.tagName === 'IMG' && (this.still.currentSrc || this.still.getAttribute('src'))) {
       this.stage.cover(this.still.currentSrc || this.still.src, 'The Current state (our composite), shown while the combinations load');
-      this.stage.msg.textContent = 'loading layer images… · meanwhile the Current state (our composite)';
+      // the note on the picture names it only when no line under it does (sims-14, 26 Sep: 'Meanwhile, Current state' said it twice)
+      this.stage.msg.textContent = this.curLine ? 'loading layer images…' : 'loading layer images… · meanwhile the Current state (our composite)';
       if (this.curLine) {   // and its own line under the picture meanwhile (what it is, the display-copy note, the original's link); showCombo replaces it
         this.srcLine.textContent = 'Meanwhile, ';
         [].forEach.call(this.curLine.childNodes, function (x) { self.srcLine.appendChild(x.cloneNode(true)); });
@@ -1314,7 +1325,8 @@
     n = combinations(m.layers);
     per = m.layers.filter(function (L) { return L.control === 'lever'; }).map(function (L) { return leverChoices(L).length; });
     this.body.insertBefore(this.shCap, this.prog); this.cap.appendChild(this.shList);   // the caption first, directly under the picture (review of 25 Sep)
-    this.cap.appendChild(el('div', { 'class': 'av-shn', text: fmtCount(n) + ' possible combinations (' + per.join(' × ') + ': the options of its ' + per.length + ' lever layer' + (per.length === 1 ? '' : 's') + ', multiplied)' }));
+    // the count once (sims-14, 26 Sep): a work's own page states it in its Shuffle line above; a card on async.html (and Pinwatch) has none
+    if (CFG.page !== 'detail') this.cap.appendChild(el('div', { 'class': 'av-shn', text: fmtCount(n) + ' possible combinations (' + per.join(' × ') + ': the options of its ' + per.length + ' lever layer' + (per.length === 1 ? '' : 's') + ', multiplied)' }));
     this.root.setAttribute('data-av-combinations', String(n));
     this.shufflePreload();
     this.shuffler = makeShuffler({
@@ -1388,6 +1400,7 @@
     if (k === 'stopped') { this.shufflePause(); if (this.spb) this.spb.disabled = true; this.shStopped = true; this.syncTap(); }   // (pausing clears the note: set it after)
     if (k === 'stopped' && this.stage.covered() && !this.combo) this.stage.msg.textContent = 'Shuffle stopped · this is the Current state (our composite)';   // no combination came: the cover stays, labelled as what it is
     this.root.setAttribute('data-av-hold', k || '');
+    if (this.spb) this.spb.hidden = k === 'starting';   // no pause button before the first combinations are there (sims-14, 26 Sep)
     if (this.smsg) this.smsg.textContent = k === 'starting' ? 'starts once the first two combinations have loaded…' : k === 'waiting' ? 'waiting for the next combination to load…'
       : k === 'stopped' ? 'Shuffle stopped: a layer’s images did not load from this site or the public IPFS gateways just now.' : '';
   };
@@ -1430,7 +1443,7 @@
     }
     d.appendChild(el('summary', { text: 'Files on IPFS' }));
     (m.states || []).forEach(function (s) { if (s.cid) a(s.cid, 'state ' + s.label + ' (' + (s.file || 'image') + ')', s.pin); });
-    if (m.mp4) a(m.mp4, 'day cycle (6 s MP4)', pin.mp4);
+    if (m.mp4) a(m.mp4, 'day cycle, 6 s MP4 (our composite)', pin.mp4);   // the pages' wording (editorial-17)
     if (m.meta) a(m.meta, 'metadata', pin.meta);
     if (m.image) a(m.image, 'the Master’s own image', pin.image);
     (m.layers || []).forEach(function (L) { (L.options || []).forEach(function (o) { if (o.cid) a(o.cid, 'layer ' + (L.label || L.id) + ': ' + o.label, o.pin); }); });
@@ -1469,6 +1482,7 @@
     if (mode) { this.choose(mode, false); this.reveal(); return; }
     this.reveal();
     mode = sget('mode.' + this.id);
+    if (!mode && this.phoneLive && this.btn.live) mode = 'live';   // sims-09: nothing asked for and nothing remembered (a chosen Strip stays Strip)
     if (!mode || mode === 'strip' || !this.btn[mode]) return;
     if (mode === 'frame') mode = 'live';   // a remembered Frame reopens as Live: full screen only on the visitor's click
     if (!window.IntersectionObserver || onScreen(this.root)) { this.choose(mode, false); return; }
@@ -1582,7 +1596,7 @@
       if (kind === null) {   // Pinwatch: a work is shown only when the viewer's data has it
         master(id).then(function (m) {
           var still, v;
-          if (m.strip) { still = el('img', { 'class': 'av-still', alt: (m.title || '') + (m.tiles ? ' — its states with their hours' : m.kind === 'lever-controlled' ? ' — as its levers stood on ' + (m.snapshot_date || '') + ' (our composite)' : ''), src: BASE + id + '/' + m.strip }); root.appendChild(still); }
+          if (m.strip) { still = el('img', { 'class': 'av-still', alt: (m.title || '') + (m.tiles ? ' — its states with their hours' : m.kind === 'lever-controlled' ? ' — the levers as read on-chain on ' + (m.snapshot_date || '') + ' (our composite)' : ''), src: BASE + id + '/' + m.strip }); root.appendChild(still); }
           v = mount({ root: root, id: id, kind: m.kind || '', still: still, keepStill: true, snap: m.snapshot_date || '',
                       lever: (m.layers || []).some(function (L) { return L.control === 'lever'; }) && !(m.layers || []).some(function (L) { return L.control === 'time'; }) });
           v.m = m;

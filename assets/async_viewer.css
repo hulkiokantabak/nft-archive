@@ -6,7 +6,11 @@
 .av-bar button{font:inherit;font-size:12.5px;line-height:18px;padding:2px 10px;border:1px solid #c3c8ce;border-radius:12px;background:#fff;color:#1f2328;cursor:pointer}
 .av-bar button:hover{border-color:#0645ad}
 .av-bar button:focus-visible,.av-ctl button:focus-visible,.av-layers button:focus-visible{outline:2px solid #0645ad;outline-offset:1px}
-.av-bar button[aria-pressed="true"],.av-bar button[aria-expanded="true"]{background:#1f2933;border-color:#1f2933;color:#fff}
+.av-bar button[aria-pressed="true"]{background:#1f2933;border-color:#1f2933;color:#fff}
+/* the Layers toggle (a panel that opens, not a mode): open is an outline and a caret, never the pressed modes' dark fill (sims-11, 26 Sep) */
+.av-bar button[aria-expanded]::after{content:" \25BE"}
+.av-bar button[aria-expanded="true"]{border-color:#1f2933;box-shadow:inset 0 0 0 1px #1f2933;background:#f6f8fa}
+.av-bar button[aria-expanded="true"]::after{content:" \25B4"}
 .av-bar .av-more{font-size:12.5px;margin-left:3px}
 .av-note{color:#8a5a00;font-size:12.5px}
 .av-body{margin:4px 0}
@@ -137,6 +141,11 @@ html.lw-js .lw-grp:has(:target){display:block}
 html:not(.av-embed) .av[data-av-lever="1"]>.av-still{max-height:80vh;width:auto}
 /* Shuffle while its layer images load: the Current state picture in the stage (its placeholder), under the 'loading' note */
 .av-ph.av-cover{background-size:contain;background-position:center}
+/* a work's page (26 Sep): the full CIDs of its files break anywhere inside the list (sims-21); the long list closed under a one-line
+   summary, below the artist's words (sims-15); '↑ creators' beside each creator's heading on async.html (sims-17) */
+.avf code{word-break:break-all}
+.avf-d{margin:4px 0 10px}.avf-d>summary{cursor:pointer;color:#0645ad;font-size:13px}.avf-d[open]>summary{margin-bottom:4px}
+.lw-up{font-size:13px;margin:-6px 0 10px}
 /* Embed view (25 Sep 2026): a work's page opened by a gallery in an iframe as async/<id>.html?embed=1. async_viewer.js's first block
    marks such a page html.av-embed (a work's own page only), and every rule here is keyed on that class: a page without embed=1 is
    exactly as before. Hidden: the site's tabs, the way back (the page's first line), the files list and everything after it (the
