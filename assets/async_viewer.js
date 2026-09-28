@@ -109,11 +109,12 @@
    "Loading states 7 of 24" and goes when all have loaded; Live says "loading current state..." until its image arrives. The
    slideshow never moves to a state whose image has not loaded, and starts once the first two are ready.
    Sources, in order: the site's display copy (a resized WebP, labelled "display copy, resized; the originals are on IPFS", with
-   the original's link), then the original on IPFS (the collector's decision O15, 23 Sep): gateway.pinata.cloud (our files are
-   pinned there), ipfs.io, dweb.link - never the dedicated gateway. The next source is asked only when the current one fails, or
-   has shown no progress for about 15 s (?stall=<ms> for tests, honoured on 127.0.0.1 / localhost only); nothing is ever aborted:
-   a stalled request is left to finish and whichever source completes first is shown. So while sources stall, more than 4
-   requests can be open (each file at most one per source). The file links list the three gateways in that order.
+   the original's link), then the original on IPFS (the collector's decision O15b, 27 Sep, after O15's second and third public
+   gateways retired on 21 Sep): gateway.pinata.cloud (Pinata's public gateway; our files are pinned at Pinata), ipfs.filebase.io,
+   c-ipfs-gw.nmkr.io - never the dedicated gateway (GATEWAYS below, one line: patches/gateways.py PAGE_GATEWAYS, checked by the build). The next source is asked only when the
+   current one fails, or has shown no progress for about 15 s (?stall=<ms> for tests, honoured on 127.0.0.1 / localhost only);
+   nothing is ever aborted: a stalled request is left to finish and whichever source completes first is shown. So while sources
+   stall, more than 4 requests can be open (each file at most one per source). The file links list the gateways in that order.
    No wallet, no transaction, no cookie. localStorage (every access inside try/catch) keeps only this visitor's choices.
    prefers-reduced-motion: nothing changes on its own unless the visitor turns it on.
    Shuffle (Chat's note of 24 Sep, B1-B4), on a lever-controlled work: "Current state" (the default: our composite of the levers as
@@ -130,7 +131,7 @@
   'use strict';
   if (!window.fetch || !window.JSON || !window.Promise || !document.querySelector || !document.addEventListener) return;   // an old browser keeps the static strip
 
-  var GATEWAYS = ['https://gateway.pinata.cloud/ipfs/', 'https://ipfs.io/ipfs/', 'https://dweb.link/ipfs/'];   // O15: in this order
+  var GATEWAYS = ['https://gateway.pinata.cloud/ipfs/', 'https://ipfs.filebase.io/ipfs/', 'https://c-ipfs-gw.nmkr.io/ipfs/'];   // O15b: in this order
   var RPCS = ['https://ethereum-rpc.publicnode.com', 'https://eth.drpc.org', 'https://eth-mainnet.public.blastapi.io', 'https://cloudflare-eth.com'];
   var GET_CONTROL_TOKEN = '0x96bc50b0';   // getControlToken(uint256) -> int256[]: min, max, current for each lever
   var CONTEXT = 'Each layer is its own token; whoever holds it sets its lever. The Master shows what they choose.';
@@ -234,7 +235,7 @@
   // ---------------------------------------------------------------- the load queue and the slideshow's clock (A1, A3, A4)
   // Pure code: the timers and the request itself come from env, so patches/test_async_preload.js runs this very text in Node on a
   // fake clock. makeQueue(env, {max, stall}) - one queue for the page:
-  //   file(key, srcs)  one image with its sources in order (the site's display copy first, then the IPFS gateways in O15's order)
+  //   file(key, srcs)  one image with its sources in order (the site's display copy first, then the IPFS gateways in O15b's order)
   //   want(f, prio)    load it (lower prio first: the order a work's states will be shown in; 0 = needed on screen now)
   //   drop(f)          a file whose request has not been sent yet leaves the queue (its viewer went back to the strip)
   //   on(f, cb)        cb(f) once f has loaded (f.ok, f.result, f.from) or every source has failed (f.failed)
@@ -868,7 +869,7 @@
     });
   };
 
-  // ---- the image of a state: its sources in order (A5: the site's display copy first, then the original on the IPFS gateways, O15)
+  // ---- the image of a state: its sources in order (A5: the site's display copy first, then the original on the IPFS gateways, O15b)
   Viewer.prototype.srcs = function (i) {
     var s = this.m.states[i], out = [];
     if (!s) return out;
@@ -1232,7 +1233,7 @@
     if (!this.panel.hidden) this.renderPanel();
     this.syncCur(); this.syncTap();
   };
-  Viewer.prototype.layerFile = function (j, k) {   // layer j's option k: its display copy first (A5), then the original on the gateways (O15)
+  Viewer.prototype.layerFile = function (j, k) {   // layer j's option k: its display copy first (A5), then the original on the gateways (O15b)
     var o = ((this.m.layers[j] || {}).options || [])[k] || {}, s = (o.display ? [BASE + o.display] : []).concat(gatewaySrcs(o.cid));
     return QUEUE.file(s[0] || ('none:' + this.id + ':l' + j + ':' + k), s);
   };
@@ -1437,7 +1438,7 @@
     function a(cid, text, note) {
       var li = el('li', null, [text + ': ']);
       li.appendChild(el('code', { text: cid.slice(0, 14) + '…' }));
-      GATEWAYS.forEach(function (g) { li.appendChild(document.createTextNode(' ')); li.appendChild(el('a', { href: g + cid, rel: 'noopener', text: g.split('/')[2] })); });   // O15: the three, in the order the viewer asks them
+      GATEWAYS.forEach(function (g) { li.appendChild(document.createTextNode(' ')); li.appendChild(el('a', { href: g + cid, rel: 'noopener', text: g.split('/')[2] })); });   // O15b: the gateways, in the order the viewer asks them
       if (note) li.appendChild(el('span', { 'class': 's', text: ' — ' + note }));   // what our own check found; never "pinned" without it
       ul.appendChild(li);
     }
