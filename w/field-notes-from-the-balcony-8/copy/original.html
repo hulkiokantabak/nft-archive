@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recursive Chamber v2 — reactive architecture — OOAKOSIMO</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/addons/p5.sound.min.js"></script>
+
+  <!-- =====================================================================
+       ███  RECURSIVE CHAMBER v2 — VJ NOTES (hidden on projector) ███
+  =======================================================================
+    The reactive/live sibling of "Visibility Valve :: The Infinite Chamber."
+    The minted SuperRare/Chonkly originals stay untouched — THIS one reacts
+    to the room. The architecture reconfigures itself to sound: the space
+    "tries to remember what it looks like" — now it remembers the music.
+
+    Based on the clean unminted standalone (chamber + shadow entities +
+    blue cracks). Now on the MOD INSTRUMENT system:
+    - 6-BAND audio (sub/bass/lowMid/mid/high/air)
+    - MOD SLOTS: every reactive property = band + min/max + curve + attack/release
+    - SOURCE CHOOSER at start: MIC / BLACKHOLE  or  MUSIC (hosted url)
+    - LIVE SLIDER PANEL (key S)
+    - Cursor still drifts the vanishing point (interaction preserved)
+
+    WHAT RIDES WHAT (defaults):
+      chamberDepth  ← sub   (corridor breathes deeper on hits)
+      vpDrift       ← mid   (perspective warps to the music)
+      frameFlare    ← high  (nested lines thicken/flare on treble)
+      entitySurge   ← bass  (shadows surge forward)
+      entityJitter  ← high  (shadows scatter on treble)
+      crackBloom    ← air   (blue cracks multiply/flare on shimmer)
+      glowSwell     ← bass  (whole chamber glows harder on swells)
+
+    HOTKEYS (click page once for focus):
+      M = mic/music (before start)   S = slider panel   1 2 3 = density
+      J = normalize   0 = HUD   F = fullscreen   + - = sensitivity
+      C = cursor-drift on/off (freeze vanishing point for hands-off)
+  ======================================================================= -->
+
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #0c0d10; cursor: default; }
+    canvas { display: block; }
+    #ui {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      color: rgba(60, 130, 200, 0.9); font-family: 'Courier New', monospace; font-size: 14px;
+      letter-spacing: 2px; text-shadow: 0 0 8px #000; z-index: 10; text-align: center;
+      transition: opacity 0.6s ease;
+    }
+    .srcBtn {
+      background: rgba(20,30,45,0.7); color: #bcd8f5; border: 1px solid rgba(80,150,220,0.5);
+      font-family: 'Courier New', monospace; font-size: 14px; letter-spacing: 1px;
+      padding: 12px 20px; margin: 5px; cursor: pointer; border-radius: 6px; min-width: 210px;
+      transition: all 0.15s ease;
+    }
+    .srcBtn:hover { background: rgba(40,70,110,0.85); border-color: #7fb8ff; }
+    .srcBtn.sel { background: rgba(60,110,170,0.9); border-color: #fff; color: #fff; }
+    #hud {
+      position: fixed; top: 10px; left: 12px; color: rgba(120,170,220,0.65);
+      font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.5;
+      z-index: 11; pointer-events: none; white-space: pre;
+    }
+    #panel {
+      position: fixed; top: 0; right: 0; height: 100vh; width: 340px;
+      background: rgba(12,16,22,0.9); border-left: 1px solid rgba(80,150,220,0.25);
+      color: #bcd8f5; font-family: 'Courier New', monospace; font-size: 11px;
+      z-index: 20; overflow-y: auto; padding: 10px 12px; box-sizing: border-box;
+      display: none; backdrop-filter: blur(4px);
+    }
+    #panel h3 { margin: 6px 0 2px; font-size: 12px; color: #7fb8ff; letter-spacing: 1px; }
+    #panel .slot { border: 1px solid rgba(80,150,220,0.15); border-radius: 6px; padding: 6px 8px; margin: 6px 0; }
+    #panel .row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+    #panel label { width: 46px; opacity: 0.7; }
+    #panel select, #panel input[type=range] { flex: 1; }
+    #panel select { background:#0e141c; color:#bcd8f5; border:1px solid rgba(80,150,220,0.3); font-family:inherit; font-size:11px; }
+    #panel .val { width: 40px; text-align: right; opacity: 0.85; }
+    #panel .name { color:#7fb8ff; font-weight:bold; }
+    #panel .hint { opacity:0.5; font-size:10px; margin:2px 0 8px; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <div style="margin-bottom:14px; letter-spacing:2px;">RECURSIVE CHAMBER // ooakosimo</div>
+    <div style="font-size:12px; opacity:0.85; margin-bottom:10px;">CHOOSE AUDIO SOURCE</div>
+    <button id="btnMic" class="srcBtn">▶ MIC / BLACKHOLE</button>
+    <button id="btnFile" class="srcBtn">♪ MUSIC (hosted)</button>
+    <div style="font-size:11px; opacity:0.5; margin-top:12px;">press M to toggle, then click a button</div>
+  </div>
+  <div id="hud"></div>
+  <div id="panel"></div>
+
+  <script>
+    // ================== CONFIG ==================
+    let   AUDIO_SOURCE = "mic";
+    const AUDIO_URL   = "https://stateofmind.neocities.org/ooakosimo-oud2.mp3";
+    let   SENSITIVITY = 1.0;
+    let   NORMALIZE   = true;
+    let   DENSITY     = 2;
+    let   SHOW_HUD    = true;
+    let   SHOW_PANEL  = false;
+    let   CURSOR_DRIFT= true;
+    const NORM_DECAY  = 0.0006;
+    const NORM_FLOOR  = 6;
+    let   MIC_GAIN    = 1.0;
+
+    let started=false, fft, micStream, micSrc, micGain, song;
+    let entities=[], baseDepth=14;
+
+    // ---------- 6-band audio ----------
+    const BANDS=["sub","bass","lowMid","mid","high","air"];
+    const BAND_HZ={sub:[20,60],bass:[60,140],lowMid:[140,400],mid:[400,1600],high:[1600,5000],air:[5000,14000]};
+    let raw={sub:0,bass:0,lowMid:0,mid:0,high:0,air:0};
+    let nrm={sub:0,bass:0,lowMid:0,mid:0,high:0,air:0};
+    let pk ={sub:8,bass:8,lowMid:8,mid:8,high:8,air:8};
+    let rawLevel=0;
+
+    // ============ MOD SLOT SYSTEM ============
+    class Mod{
+      constructor(name,band,min,max,curve=1,attack=0.35,release=0.12){
+        this.name=name;this.band=band;this.min=min;this.max=max;
+        this.curve=curve;this.attack=attack;this.release=release;this.value=min;this._s=0;
+      }
+      update(){
+        let x=Math.pow(Math.max(0,Math.min(1,nrm[this.band])),this.curve);
+        let k=(x>this._s)?this.attack:this.release;
+        this._s+=(x-this._s)*k;
+        this.value=this.min+this._s*(this.max-this.min);
+        return this.value;
+      }
+    }
+    let MODS={
+      // name            band       min   max   curve att   rel
+      chamberDepth:new Mod("chamberDepth","sub",   11,  24,  0.7, 0.4, 0.05),
+      vpDrift:     new Mod("vpDrift","mid",        0,   90,  0.8, 0.4, 0.07),
+      frameFlare:  new Mod("frameFlare","high",    0,   4.5, 0.7, 0.5, 0.12),
+      entitySurge: new Mod("entitySurge","bass",   1,   3.4, 0.85,0.5, 0.10),
+      entityJitter:new Mod("entityJitter","high",  0,   6,   0.7, 0.5, 0.13),
+      crackBloom:  new Mod("crackBloom","air",     18,  90,  0.6, 0.6, 0.14),
+      crackFlare:  new Mod("crackFlare","air",     28,  150, 0.7, 0.6, 0.12),
+      glowSwell:   new Mod("glowSwell","bass",     0,   90,  0.8, 0.55,0.10),
+    };
+    function updateMods(){ for(let k in MODS) MODS[k].update(); }
+    function M(n){ return MODS[n].value; }
+
+    function setup(){
+      createCanvas(windowWidth,windowHeight);
+      pixelDensity(Math.min(window.devicePixelRatio||1,1.5));
+      fft=new p5.FFT(0.8,1024);
+      buildEntities();
+      buildPanel();
+      document.getElementById('btnMic').addEventListener('click',e=>{e.stopPropagation();AUDIO_SOURCE="mic";refreshChooser();initAudio();});
+      document.getElementById('btnFile').addEventListener('click',e=>{e.stopPropagation();AUDIO_SOURCE="file";refreshChooser();initAudio();});
+      refreshChooser();
+    }
+
+    function buildEntities(){
+      entities=[];
+      let n=Math.floor(65*(DENSITY===1?0.5:DENSITY===3?1.1:0.8));
+      for(let i=0;i<n;i++) entities.push(new ShadowEntity(random(width),random(height),random(width),random(height)));
+    }
+
+    function refreshChooser(){
+      let bm=document.getElementById('btnMic'),bf=document.getElementById('btnFile');
+      if(bm) bm.classList.toggle('sel',AUDIO_SOURCE==="mic");
+      if(bf) bf.classList.toggle('sel',AUDIO_SOURCE==="file");
+    }
+
+    function initAudio(){
+      if(started) return;
+      userStartAudio();
+      if(AUDIO_SOURCE==="mic"){
+        navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}})
+        .then(stream=>{
+          micStream=stream; let ac=getAudioContext();
+          micSrc=ac.createMediaStreamSource(stream);
+          micGain=ac.createGain(); micGain.gain.value=MIC_GAIN;
+          micSrc.connect(micGain); fft.setInput(micGain);
+        }).catch(e=>{ let u=document.getElementById('ui'); if(u){u.style.opacity='1';u.innerHTML='<div style="color:#f88">MIC BLOCKED — use https/Live Server, allow mic. Press M for MUSIC.</div>';started=false;} console.error(e); });
+      } else {
+        song=loadSound(AUDIO_URL,()=>{song.loop();fft.setInput(song);},
+          err=>{ let u=document.getElementById('ui'); if(u){u.style.opacity='1';u.innerHTML='<div style="color:#f88">MUSIC FAILED (check net / AUDIO_URL). Press M for MIC.</div>';started=false;} console.error(err); });
+      }
+      started=true;
+      document.getElementById('ui').style.opacity='0';
+    }
+
+    function adaptBand(rv,pkv){ pkv=Math.max(rv,pkv*(1-NORM_DECAY)); if(pkv<NORM_FLOOR) return [0,pkv]; return [Math.max(0,Math.min(1,rv/pkv)),pkv]; }
+
+    function readAudio(){
+      if(started && fft){
+        fft.analyze();
+        for(let b of BANDS) raw[b]=fft.getEnergy(BAND_HZ[b][0],BAND_HZ[b][1]);
+      } else {
+        raw.sub=40+30*Math.sin(frameCount*0.03); raw.bass=50+25*Math.sin(frameCount*0.05+1);
+        raw.lowMid=45+20*Math.sin(frameCount*0.02+2); raw.mid=50+22*Math.sin(frameCount*0.04+3);
+        raw.high=45+25*Math.sin(frameCount*0.07+4); raw.air=40+20*Math.sin(frameCount*0.09+5);
+      }
+      rawLevel=(raw.sub+raw.bass+raw.lowMid+raw.mid+raw.high+raw.air)/6;
+      for(let b of BANDS){
+        let n; if(NORMALIZE){[n,pk[b]]=adaptBand(raw[b],pk[b]);} else {n=Math.max(0,Math.min(1,(raw[b]-40)/215));}
+        nrm[b]=Math.max(0,Math.min(1,n*SENSITIVITY));
+      }
+    }
+
+    function draw(){
+      readAudio();
+      updateMods();
+
+      background(238,232,222);
+      drawPaperTexture();
+
+      // vanishing point: cursor drift (if on) + audio warp
+      let baseVX=width*0.5, baseVY=height*0.42;
+      if(CURSOR_DRIFT){ baseVX=lerp(width*0.5,mouseX,0.3); baseVY=lerp(height*0.42,mouseY,0.25); }
+      let warp=M("vpDrift");
+      let vx=baseVX + Math.sin(frameCount*0.02)*warp*(nrm.mid+0.15);
+      let vy=baseVY + Math.cos(frameCount*0.017)*warp*0.6*(nrm.mid+0.15);
+
+      let depth=Math.round(M("chamberDepth"));
+      drawRecursiveChamber(vx,vy,depth);
+
+      let surge=M("entitySurge"), jitter=M("entityJitter");
+      for(let ent of entities){ ent.update(surge,jitter); ent.display(); }
+
+      drawBlueCracks();
+
+      // glow swell — a soft additive wash on bass swells
+      let g=M("glowSwell");
+      if(g>2){ noStroke(); fill(100,160,230, g*0.35); rect(0,0,width,height); }
+
+      drawHUD();
+    }
+
+    function drawRecursiveChamber(vx,vy,depth){
+      let flare=M("frameFlare");
+      let energy=(nrm.bass+nrm.mid+nrm.high)/3;
+      for(let i=0;i<depth;i++){
+        let t=i/depth;
+        let w=width*(1-t*0.88), h=height*(1-t*0.88);
+        let insetX=(vx-width/2)*t*0.65, insetY=(vy-height/2)*t*0.5;
+        push();
+        translate(width/2+insetX, height/2+insetY);
+        noFill();
+        // frame brightness swells with energy
+        stroke(35-energy*10, 32+energy*40, 28+energy*80, 240-i*13);
+        strokeWeight(map(i,0,depth,6,0.8) + flare*(1-t));
+        rect(-w/2,-h/2,w,h);
+        stroke(55,50,45,110+energy*60);
+        line(-w/2,-h/2,0,0); line(w/2,-h/2,0,0);
+        line(-w/2,h/2,0,0);  line(w/2,h/2,0,0);
+        pop();
+      }
+    }
+
+    class ShadowEntity{
+      constructor(x,y,tx,ty){
+        this.pos=createVector(x,y);
+        this.target=createVector(tx,ty);
+        this.size=random(12,28);
+        this.breathe=random(TWO_PI);
+      }
+      update(surge,jitter){
+        let d=p5.Vector.sub(this.target,this.pos);
+        d.setMag(1.1*surge);
+        this.pos.add(d);
+        this.pos.x+=map(noise(this.pos.x*0.01,frameCount*0.01),0,1,-0.8,0.8)*(1+jitter);
+        this.pos.y+=map(noise(this.pos.y*0.01+99,frameCount*0.01),0,1,-0.6,0.6)*jitter;
+        // occasionally repick target so they roam (more when loud)
+        if(p5.Vector.dist(this.pos,this.target)<20 || random()<0.002+nrm.bass*0.01){
+          this.target.set(random(width),random(height));
+        }
+      }
+      display(){
+        push();
+        translate(this.pos.x,this.pos.y);
+        let breathe=sin(frameCount*0.04+this.breathe)*1.8*(1+nrm.lowMid);
+        let look=map(mouseX-this.pos.x,-200,200,-3,3);
+        stroke(18,22,28); strokeWeight(2.8);
+        for(let i=0;i<5;i++){ let off=random(-1.5,1.5); line(off,breathe+2,off+random(-4,4),this.size*1.45+breathe); }
+        fill(10); noStroke();
+        ellipse(0,breathe+this.size*0.5,this.size*0.7,this.size*1.5);
+        fill(245,242,235); stroke(15); strokeWeight(2);
+        ellipse(0,breathe-7,this.size*0.58,this.size*0.62);
+        fill(12);
+        ellipse(-this.size*0.14+look,breathe-8,2.8,2.8);
+        ellipse(this.size*0.14+look,breathe-8,2.8,2.8);
+        noFill(); stroke(12); strokeWeight(1.2);
+        arc(0,breathe-1,9,5,0.1,PI-0.1);
+        pop();
+      }
+    }
+
+    function drawPaperTexture(){
+      stroke(40,35,30,22);
+      let n=Math.floor(700*(DENSITY===1?0.5:DENSITY===3?1.0:0.75));
+      for(let i=0;i<n;i++) point(random(width),random(height));
+    }
+
+    function drawBlueCracks(){
+      let count=Math.floor(M("crackBloom"));
+      let reach=M("crackFlare");
+      stroke(100,170,230, 38+nrm.air*120);
+      for(let i=0;i<count;i++){
+        let x=noise(i,frameCount*0.003)*width;
+        let y=noise(i+50,frameCount*0.0028)*height;
+        line(x,y,x+random(-reach,reach),y+random(-reach*0.9,reach*0.9));
+      }
+    }
+
+    function drawHUD(){
+      let h=document.getElementById('hud');
+      if(!SHOW_HUD){ h.textContent=''; return; }
+      let lvl=Math.max(0,Math.min(12,Math.floor(rawLevel/13)));
+      let meter='['+'#'.repeat(lvl)+'-'.repeat(12-lvl)+']';
+      h.textContent=
+        `CHAMBER v2 ${AUDIO_SOURCE==="mic"?'MIC':'MUSIC'} ${started?'LIVE':'idle'}  in:${meter} ${rawLevel.toFixed(0)}  norm:${NORMALIZE?'on':'off'}\n`+
+        `sub:${(nrm.sub*99).toFixed(0)} bas:${(nrm.bass*99).toFixed(0)} lm:${(nrm.lowMid*99).toFixed(0)} mid:${(nrm.mid*99).toFixed(0)} hi:${(nrm.high*99).toFixed(0)} air:${(nrm.air*99).toFixed(0)}\n`+
+        `depth:${Math.round(M("chamberDepth"))}  dens:${DENSITY}  cursor:${CURSOR_DRIFT?'on':'off'}  sens:${SENSITIVITY.toFixed(1)}  fps:${Math.round(frameRate())}`;
+    }
+
+    // ============ SLIDER PANEL ============
+    function buildPanel(){
+      let p=document.getElementById('panel');
+      let html=`<h3>MOD PATCH BAY</h3><div class="hint">band → property, min/max clamp + curve. the architecture reconfigures itself to sound.</div>`;
+      for(let key in MODS){
+        let m=MODS[key];
+        let opts=BANDS.map(b=>`<option value="${b}" ${b===m.band?'selected':''}>${b}</option>`).join('');
+        html+=`<div class="slot" data-k="${key}">
+          <div class="row"><span class="name">${m.name}</span></div>
+          <div class="row"><label>band</label><select data-p="band">${opts}</select></div>
+          <div class="row"><label>min</label><input type="range" data-p="min" min="${m.min<0?m.min:0}" max="${m.max||1}" step="0.01" value="${m.min}"><span class="val" data-v="min">${m.min}</span></div>
+          <div class="row"><label>max</label><input type="range" data-p="max" min="0" max="${(m.max||1)*1.5}" step="0.01" value="${m.max}"><span class="val" data-v="max">${m.max}</span></div>
+          <div class="row"><label>curve</label><input type="range" data-p="curve" min="0.3" max="3" step="0.05" value="${m.curve}"><span class="val" data-v="curve">${m.curve}</span></div>
+          <div class="row"><label>attack</label><input type="range" data-p="attack" min="0.05" max="1" step="0.01" value="${m.attack}"><span class="val" data-v="attack">${m.attack}</span></div>
+          <div class="row"><label>release</label><input type="range" data-p="release" min="0.02" max="0.6" step="0.01" value="${m.release}"><span class="val" data-v="release">${m.release}</span></div>
+        </div>`;
+      }
+      p.innerHTML=html;
+      p.querySelectorAll('.slot').forEach(slot=>{
+        let key=slot.dataset.k;
+        slot.querySelectorAll('select,input').forEach(el=>{
+          el.addEventListener('input',()=>{
+            let prop=el.dataset.p;
+            if(prop==='band') MODS[key].band=el.value;
+            else { MODS[key][prop]=parseFloat(el.value); let v=slot.querySelector(`[data-v="${prop}"]`); if(v) v.textContent=el.value; }
+          });
+        });
+      });
+    }
+
+    function keyPressed(){
+      let k=key.toLowerCase();
+      if(k==='m'){ if(!started){ AUDIO_SOURCE=(AUDIO_SOURCE==="mic")?"file":"mic"; refreshChooser(); } }
+      if(!started && keyCode===ENTER){ initAudio(); return; }
+      if(k==='s'){ SHOW_PANEL=!SHOW_PANEL; document.getElementById('panel').style.display=SHOW_PANEL?'block':'none'; }
+      if(k==='j') NORMALIZE=!NORMALIZE;
+      if(k==='0') SHOW_HUD=!SHOW_HUD;
+      if(k==='c') CURSOR_DRIFT=!CURSOR_DRIFT;
+      if(k==='f'){ if(!fullscreen()) fullscreen(true); else fullscreen(false); }
+      if(k==='='||k==='+') SENSITIVITY=Math.min(SENSITIVITY+0.1,3);
+      if(k==='-'||k==='_') SENSITIVITY=Math.max(SENSITIVITY-0.1,0.2);
+      if(k==='1'){DENSITY=1;buildEntities();}
+      if(k==='2'){DENSITY=2;buildEntities();}
+      if(k==='3'){DENSITY=3;buildEntities();}
+    }
+
+    function mousePressed(){
+      if(mouseX>window.innerWidth-340 && SHOW_PANEL) return; // don't reshuffle when using panel
+      // click still fractures depth like the original
+      MODS.chamberDepth.min = int(random(11,18));
+      MODS.chamberDepth.max = MODS.chamberDepth.min + int(random(4,10));
+    }
+
+    function windowResized(){ resizeCanvas(windowWidth,windowHeight); }
+  </script>
+</body>
+</html>

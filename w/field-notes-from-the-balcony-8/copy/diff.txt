@@ -1,0 +1,17 @@
+# You are the voice of a neural casino that dreams... Recursive Chamber v2 — reactive architecture standalone vj art piece — OOAKOSIMO - Mohini (signs as OOAKOSIMO) (FIELD NOTES FROM THE BALCONY): original.html -> index.html
+# The ONLY changes: each outside URL below replaced by its relative deps/ path (occurrences in the file):
+#   https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js  ->  deps/p5.min.js  (1x)
+#   https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/addons/p5.sound.min.js  ->  deps/p5.sound.min.js  (1x)
+#   https://stateofmind.neocities.org/ooakosimo-oud2.mp3  ->  deps/ooakosimo-oud2.mp3  (1x)
+# Reverse check: putting the URLs back into index.html gives original.html byte for byte: YES
+# original.html sha256 6019bf029b8e1a10d9c6f6912f4a547501555c775f03fe3de8bdad319ad8f13e (18,356 B); index.html sha256 3e4f4371c4243cab2f50a7222d7af3744fb36f8f2b44208040e7094e9de71aed (18,228 B)
+--- original.html
++++ index.html
+@@ -7,2 +7,2 @@
+-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/addons/p5.sound.min.js"></script>
++  <script src="deps/p5.min.js"></script>
++  <script src="deps/p5.sound.min.js"></script>
+@@ -95 +95 @@
+-    const AUDIO_URL   = "https://stateofmind.neocities.org/ooakosimo-oud2.mp3";
++    const AUDIO_URL   = "deps/ooakosimo-oud2.mp3";

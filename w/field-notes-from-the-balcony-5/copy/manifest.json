@@ -1,0 +1,63 @@
+{
+ "what": "Preservation copy of \"Alamat ng Pinya: The Thousand-Eyed Satellite\" by Mohini (signs as OOAKOSIMO) (FIELD NOTES FROM THE BALCONY, SuperRare)",
+ "statement": "The artist's file is unchanged, except that its outside files (listed below) now load from this copy: original.html is byte-identical to the token's own file, and index.html differs from it only in those URLs, each replaced by a relative deps/ path (diff.txt; putting the URLs back gives original.html byte for byte).",
+ "token": {
+  "chain": "ethereum",
+  "contract": "0x911d7b92f96ba7de2c8b833d42efff674f7443d4",
+  "token_id": "5",
+  "token_uri": "ipfs://bafybeibzkydujpobax46k35gftt25tkgkxij4lsmh2jmmazhhwgmavcdkm/metadata.json",
+  "metadata_cid": "bafybeibzkydujpobax46k35gftt25tkgkxij4lsmh2jmmazhhwgmavcdkm",
+  "image_cid": "QmVsrwyeb5yDrkAx4j7hDf45HyqZqbBM43YTdhJL5GK9Fm",
+  "animation_cid": "QmTEBLyYk53maKJM1rvff1LzLHp2FDRcG3TWkhuM21mFJv",
+  "original_url": "ipfs://QmTEBLyYk53maKJM1rvff1LzLHp2FDRcG3TWkhuM21mFJv"
+ },
+ "original_html": {
+  "path": "original.html",
+  "bytes": 4188,
+  "sha256": "e69d15b7cbea75e0ac66660b667ea0b8ba9150a2b04693d31811015b6d5025a4",
+  "same_as": "the token's own file ipfs://QmTEBLyYk53maKJM1rvff1LzLHp2FDRcG3TWkhuM21mFJv"
+ },
+ "index_html": {
+  "path": "index.html",
+  "bytes": 4142,
+  "sha256": "6d705e374438c681f02c74ca491deae6325b8f47267a9e41fbcc08cd77305426",
+  "changes": [
+   {
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js",
+    "now": "deps/p5.min.js",
+    "occurrences": 1
+   }
+  ],
+  "reverse_check": "putting the URLs back gives original.html byte for byte"
+ },
+ "outside_files": [
+  {
+   "url": "https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js",
+   "path": "deps/p5.min.js",
+   "bytes": 1029097,
+   "sha256": "726ac96626b93f5bcaff83a910b6c60d3a9728f063e0eb73b5d0819ffc356915",
+   "fetched_utc": [
+    "2026-10-17T13:46:19Z",
+    "2026-10-17T13:46:22Z"
+   ],
+   "content_type": "application/javascript; charset=utf-8",
+   "what": "p5.js 1.9.0 (cdnjs)"
+  }
+ ],
+ "licences": [
+  {
+   "path": "deps/LICENSE-p5.js.txt",
+   "what": "p5.js - GNU Lesser General Public License 2.1 (the project's license.txt at tag v1.9.0)",
+   "source": "https://raw.githubusercontent.com/processing/p5.js/v1.9.0/license.txt",
+   "bytes": 24480,
+   "sha256": "eb2f25f8f165d5f20682c1ce7e99ce69144ecfd80fbed8c17dfd327ecd8b6cb6",
+   "fetched_utc": "2026-10-17T13:47:06Z"
+  }
+ ],
+ "not_archivable": [],
+ "notes": [
+  "The page's own title is \"Pineapple Delight\"; the token's name is \"Alamat ng Pinya: The Thousand-Eyed Satellite\"."
+ ],
+ "built_utc": "2026-10-17T14:34:04Z",
+ "built_by": "pinata-handoff .cache/final_1017/tools/build_copies.py (Chat C-078)"
+}

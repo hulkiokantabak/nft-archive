@@ -1,0 +1,110 @@
+{
+ "what": "Preservation copy of \"You are the voice of a neural casino that dreams... Recursive Chamber v2 — reactive architecture standalone vj art piece — OOAKOSIMO\" by Mohini (signs as OOAKOSIMO) (FIELD NOTES FROM THE BALCONY, SuperRare)",
+ "statement": "The artist's file is unchanged, except that its outside files (listed below) now load from this copy: original.html is byte-identical to the token's own file, and index.html differs from it only in those URLs, each replaced by a relative deps/ path (diff.txt; putting the URLs back gives original.html byte for byte).",
+ "token": {
+  "chain": "ethereum",
+  "contract": "0x911d7b92f96ba7de2c8b833d42efff674f7443d4",
+  "token_id": "8",
+  "token_uri": "ipfs://bafybeic2lpl2gharbqwgdwxagkjwnc2zdx33j5jqr6oqqa23h64ohxxnsm/metadata.json",
+  "metadata_cid": "bafybeic2lpl2gharbqwgdwxagkjwnc2zdx33j5jqr6oqqa23h64ohxxnsm",
+  "image_cid": "QmQGFNmPBVw3JHdngwzsb9uQa7Pbq6HP4ubm9SEEgz3uab",
+  "animation_cid": "QmbLFNyChziDYBeuQMf5mKW6RcMHrmgCzjH3mr5bnxfB9y",
+  "original_url": "ipfs://QmbLFNyChziDYBeuQMf5mKW6RcMHrmgCzjH3mr5bnxfB9y"
+ },
+ "original_html": {
+  "path": "original.html",
+  "bytes": 18356,
+  "sha256": "6019bf029b8e1a10d9c6f6912f4a547501555c775f03fe3de8bdad319ad8f13e",
+  "same_as": "the token's own file ipfs://QmbLFNyChziDYBeuQMf5mKW6RcMHrmgCzjH3mr5bnxfB9y"
+ },
+ "index_html": {
+  "path": "index.html",
+  "bytes": 18228,
+  "sha256": "3e4f4371c4243cab2f50a7222d7af3744fb36f8f2b44208040e7094e9de71aed",
+  "changes": [
+   {
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js",
+    "now": "deps/p5.min.js",
+    "occurrences": 1
+   },
+   {
+    "url": "https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/addons/p5.sound.min.js",
+    "now": "deps/p5.sound.min.js",
+    "occurrences": 1
+   },
+   {
+    "url": "https://stateofmind.neocities.org/ooakosimo-oud2.mp3",
+    "now": "deps/ooakosimo-oud2.mp3",
+    "occurrences": 1
+   }
+  ],
+  "reverse_check": "putting the URLs back gives original.html byte for byte"
+ },
+ "outside_files": [
+  {
+   "url": "https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js",
+   "path": "deps/p5.min.js",
+   "bytes": 1034532,
+   "sha256": "00a532c56e785c68d7c7bb6f9a084e2c856b71527f22c3260aff4a2f582d80c9",
+   "fetched_utc": [
+    "2026-10-17T13:46:50Z",
+    "2026-10-17T13:46:53Z"
+   ],
+   "content_type": "application/javascript; charset=utf-8",
+   "what": "p5.js 1.9.4 (cdnjs)"
+  },
+  {
+   "url": "https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/addons/p5.sound.min.js",
+   "path": "deps/p5.sound.min.js",
+   "bytes": 200064,
+   "sha256": "f067ef7cf80b3561327e7b14661ec980fbd34b2baf1e0a9d529a120132ba0107",
+   "fetched_utc": [
+    "2026-10-17T13:46:54Z",
+    "2026-10-17T13:46:57Z"
+   ],
+   "content_type": "application/javascript; charset=utf-8",
+   "what": "p5.sound 1.0.1 (cdnjs, the p5.js 1.9.4 add-on)"
+  },
+  {
+   "url": "https://stateofmind.neocities.org/ooakosimo-oud2.mp3",
+   "path": "deps/ooakosimo-oud2.mp3",
+   "bytes": 10365038,
+   "sha256": "349144f3e57fd6644f974e326cfae2a6e2d6b4aeffca525dd752a008f2d86f3f",
+   "fetched_utc": [
+    "2026-10-17T13:46:58Z",
+    "2026-10-17T13:47:03Z"
+   ],
+   "content_type": "audio/mpeg",
+   "what": "the music (the artist's own file)"
+  }
+ ],
+ "licences": [
+  {
+   "path": "deps/LICENSE-p5.js.txt",
+   "what": "p5.js - GNU Lesser General Public License 2.1 (the project's license.txt at tag v1.9.4)",
+   "source": "https://raw.githubusercontent.com/processing/p5.js/v1.9.4/license.txt",
+   "bytes": 24480,
+   "sha256": "eb2f25f8f165d5f20682c1ce7e99ce69144ecfd80fbed8c17dfd327ecd8b6cb6",
+   "fetched_utc": "2026-10-17T13:47:11Z"
+  },
+  {
+   "path": "deps/LICENSE-p5.sound.txt",
+   "what": "p5.sound - MIT License (the p5.js-sound repository's LICENSE)",
+   "source": "https://raw.githubusercontent.com/processing/p5.js-sound/main/LICENSE",
+   "bytes": 1097,
+   "sha256": "06ad602128760a59b66d37bcbb8fc15dfcc31f619297c6d68b155bca76438a2e",
+   "fetched_utc": "2026-10-17T13:47:15Z"
+  }
+ ],
+ "not_archivable": [
+  {
+   "what": "the microphone input",
+   "why": "the viewer's own sound in the room (the piece starts on MIC; press M for the music)"
+  }
+ ],
+ "notes": [
+  "The page's own title is \"Recursive Chamber v2 — reactive architecture — OOAKOSIMO\"."
+ ],
+ "built_utc": "2026-10-17T14:34:04Z",
+ "built_by": "pinata-handoff .cache/final_1017/tools/build_copies.py (Chat C-078)"
+}

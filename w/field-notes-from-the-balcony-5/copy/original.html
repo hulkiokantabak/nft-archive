@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pineapple Delight</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0a0a0a;
+            overflow: hidden; /* Prevents scrollbars */
+            touch-action: none; /* Prevents mobile scrolling gestures */
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+
+<script>
+
+/**
+SOVEREIGN PINEAPPLE v3 — MOBILE + ORBIT EDITION
+
+UPGRADES:
+- WEBGL + orbitControl()
+- Touch drag = rotate camera
+- Chaos still mapped to horizontal interaction
+- Optimized for iPhone/tablet (low poly + pixelDensity)
+
+NOTE:
+- 2D sketch reinterpreted into 3D plane-based composition
+*/
+
+let t = 0;
+let chaos = 1;
+let targetChaos = 1;
+
+// --- MOBILE OPTIMIZATION ---
+let GRID_STEP = 25;
+let SMOKE_COUNT = 6;
+let GLITCH_COUNT = 8;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight, WEBGL);
+  pixelDensity(1);
+  angleMode(DEGREES);
+}
+
+function draw() {
+  background(10);
+
+  orbitControl(); // 🔥 CAMERA CONTROL
+
+  // smooth chaos
+  chaos = lerp(chaos, targetChaos, 0.1);
+
+  // slight tilt for cinematic feel
+  rotateX(5);
+
+  drawGlitchBackground();
+  drawSmoke();
+  drawTubes();
+  drawPineapple();
+  drawCrown();
+
+  t += 0.5 * chaos;
+}
+
+// --- GLITCH BACKGROUND (DEPTH LAYERS) ---
+function drawGlitchBackground() {
+  noStroke();
+
+  for (let i = 0; i < GLITCH_COUNT * chaos; i++) {
+    push();
+    translate(
+      random(-width, width),
+      random(-height, height),
+      random(-500, -100)
+    );
+
+    fill(random([0, 255]), random(50), random(50), 80);
+    plane(random(80), random(20));
+
+    pop();
+  }
+}
+
+// --- SMOKE (FLOATING PLANES) ---
+function drawSmoke() {
+  noStroke();
+
+  for (let i = 0; i < SMOKE_COUNT; i++) {
+    let x = noise(i, t * 0.01) * width - width / 2;
+    let y = noise(i + 50, t * 0.01) * height - height / 2;
+
+    push();
+    translate(x, y, -100);
+
+    fill(255, 30);
+    plane(80 * chaos, 50 * chaos);
+
+    pop();
+  }
+}
+
+// --- TUBES (3D CURVES) ---
+function drawTubes() {
+  stroke(200);
+  strokeWeight(3);
+  noFill();
+
+  for (let i = 0; i < 3; i++) {
+    beginShape();
+    for (let x = -width / 2; x < width / 2; x += 40) {
+      let y =
+        sin(x * 0.05 + t * chaos * 2 + i * 50) *
+        (50 + random(-10, 10) * chaos);
+
+      curveVertex(x, y, 0);
+    }
+    endShape();
+  }
+}
+
+// --- PINEAPPLE BODY (3D GRID + GLITCH) ---
+function drawPineapple() {
+  push();
+
+  let dx = sin(t * 2) * 10 * chaos;
+  let dy = cos(t * 2.5) * 8 * chaos;
+
+  translate(dx, dy, 0);
+  rotateY(sin(t) * 10 * chaos);
+
+  for (let y = -100; y < 100; y += GRID_STEP) {
+    for (let x = -80; x < 80; x += GRID_STEP) {
+      let d = dist(x, y, 0, 0);
+      if (d < 100) {
+        let n = noise(x * 0.05, y * 0.05, t * 0.02);
+
+        push();
+        translate(x, y, 0);
+
+        // base tile
+        fill(180 + n * 75, 120 + n * 80, 20);
+        stroke(0);
+        plane(12, 12);
+
+        // glitch extrusion
+        if (random() < 0.15 * chaos) {
+          translate(0, 0, random(20));
+          fill(random([0, 255]), random(255), random(255));
+          box(6);
+        }
+
+        pop();
+      }
+    }
+  }
+
+  pop();
+}
+
+// --- CROWN (3D SPIKES) ---
+function drawCrown() {
+  push();
+
+  translate(0, -150, 0);
+
+  for (let i = 0; i < 16; i++) {
+    let angle = map(i, 0, 16, 0, 360);
+
+    push();
+    rotateY(angle);
+    rotateX(-60 + sin(t * 2 + i * 10) * 20 * chaos);
+
+    let len =
+      100 +
+      sin(t * 2 + i * 10) * 30 * chaos +
+      random(-10, 10) * chaos;
+
+    fill(
+      100 + random(-50, 50),
+      255,
+      150 + random(-50, 50)
+    );
+
+    cone(6, len);
+
+    pop();
+  }
+
+  pop();
+}
+
+// --- INTERACTION ---
+function mouseMoved() {
+  targetChaos = map(mouseX, 0, width, 0.5, 3);
+}
+
+function touchMoved() {
+  targetChaos = map(touchX, 0, width, 0.5, 3);
+  return false;
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+
+</script>
+
+</body>
+</html>

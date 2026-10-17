@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>MO ON THE KEYS :: PSYCHO NOIR AUTOPILOT — OOAKOSIMO</title>
+<link rel="icon" href="https://ooakosimo.neocities.org/gumamela.gif" type="image/gif">
+<!-- VJ NOTES: S sliders | M source before start | P music pause | SPACE freeze
+J normalize | ;/L mic gain | 1/2/3 density | +/- sensitivity | 0 HUD | F fullscreen -->
+<script src="https://ooakosimo.neocities.org/keys/p5.min.js"></script><script src="https://ooakosimo.neocities.org/keys/p5.sound.min.js"></script>
+<script src="https://ooakosimo.neocities.org/keys/mqtt.min.js"></script>
+<style>
+:root{--paper:#ded6c3;--ink:#111;--cream:#f5f1e7;--red:#e0452f}
+*{box-sizing:border-box}html,body{margin:0;overflow:hidden;background:var(--paper);font-family:'Courier New',monospace}canvas{display:block}
+#start{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 20px 12vh;background:var(--paper) url('https://ooakosimo.neocities.org/keys/mo-on-keys-coverFIN.png') no-repeat center/cover;text-align:center;transition:opacity .65s,transform .65s cubic-bezier(.6,-.28,.735,.045);animation:zoom 10s infinite alternate ease-in-out}
+#start:before{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent 0 5px,#1112 6px);mix-blend-mode:multiply;animation:scan 5s linear infinite}#start:after{content:'';position:absolute;left:-20%;top:20%;width:140%;height:7%;pointer-events:none;background:#f5f1e733;mix-blend-mode:difference;animation:glitchBand 3.7s steps(1) infinite}
+#start.launching{transform:scale(2.5);opacity:0;pointer-events:none}@keyframes zoom{to{transform:scale(1.06)}}
+@keyframes scan{to{transform:translateY(12px)}}@keyframes glitchBand{0%,88%{top:18%;transform:skewX(0)}89%{top:67%;transform:skewX(18deg)}91%{top:42%;transform:skewX(-12deg)}94%,100%{top:18%;transform:skewX(0)}}
+.tag,.sources,.hint{position:relative;z-index:2}.tag{margin-bottom:12px;padding:5px 9px;color:var(--cream);background:var(--ink);font-size:11px;letter-spacing:2px;animation:tagPulse 2.3s steps(2) infinite}.sources{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}@keyframes tagPulse{50%{letter-spacing:3px;transform:translateX(2px)}}
+.src{min-width:210px;padding:12px 18px;border:3px solid var(--ink);color:var(--ink);background:var(--cream);box-shadow:6px 6px var(--ink);cursor:pointer;font:900 14px 'Courier New';text-transform:uppercase}.src:hover,.src.sel{color:var(--cream);background:var(--ink);box-shadow:6px 6px var(--red)}
+.hint{margin-top:14px;padding:4px 7px;background:#f5f1e7cc;font-size:10px}
+#transport{position:fixed;right:18px;bottom:18px;z-index:12;display:none}#play{width:48px;height:48px;border:2px solid var(--ink);background:#f5f1e7bb;font-size:18px;cursor:pointer}
+#hud{position:fixed;top:10px;left:12px;z-index:11;color:#1119;font-size:11px;line-height:1.45;pointer-events:none;white-space:pre}
+#mqttStatus{position:fixed;left:12px;bottom:10px;z-index:11;padding:4px 7px;color:#f5f1e7;background:#111c;font-size:10px}.ok{color:#78ff95!important}.warn{color:#ffbf69!important}
+#panel{position:fixed;top:0;right:0;z-index:20;display:none;width:350px;height:100vh;padding:12px;overflow-y:auto;color:var(--cream);background:#11100ff2;border-left:2px solid var(--red);backdrop-filter:blur(5px);font-size:11px}
+#panel h2{margin:3px 0;color:#fff;font-size:14px;letter-spacing:2px}#panel>.hint{margin:0 0 9px;color:#aaa;background:none;line-height:1.35}
+.slot{margin:7px 0;padding:7px;border:1px dashed #625d55}.slot-name{margin-bottom:4px;color:#ff6c50;font-weight:bold}.row{display:flex;align-items:center;gap:6px;min-height:23px}.row label{width:48px;color:#aaa}.row select,.row input{flex:1;min-width:0}.row select{border:1px solid #625d55;color:var(--cream);background:#201e1b;font:11px 'Courier New'}.value{width:44px;text-align:right}input[type=range]{accent-color:var(--red)}
+</style></head>
+<body>
+<div id="start"><div class="tag">MO ON THE KEYS // VJ MOD INSTRUMENT</div><div class="sources"><button id="mic" class="src">▶ MIC / BLACKHOLE</button><button id="music" class="src">♪ MUSIC / MANUAL</button><button id="autoStart" class="src">∞ DISPLAY / AUTO</button></div><div class="hint">animated attract mode · AUTO cruises when nobody is flying</div></div>
+<div id="transport"><button id="play">Ⅱ</button></div><div id="hud"></div><div id="mqttStatus" class="warn">REMOTE: connecting…</div><div id="panel"></div>
+<script>
+let AUDIO_SOURCE='music',SENSITIVITY=1,MIC_GAIN=1.5,NORMALIZE=true,DENSITY=2,SHOW_HUD=true,SHOW_PANEL=false,FROZEN=false;
+const AUDIO_URL='https://ooakosimo.neocities.org/keys/Mo-on-the-keys-v1.mp3',NORM_DECAY=.0006,NORM_FLOOR=6;
+let song,fft,micStream,micSrc,micGain,started=false,lines=[],circles=[],saxStrokes=[],rawLevel=0;
+let MOTION=1,CHAOS=.35,CONTRAST=1,AUTO_CRUISE=true,autoActive=false,lastControl=0,lastAutoHit=0,flash=0,invertFlash=0,shake=0,lowFpsFrames=0,mqttClient=null;
+const MQTT_DEFAULT='wss://broker.hivemq.com:8884/mqtt',SESSION_DEFAULT='mo-keys-ooakosimo';
+let MQTT_URL=localStorage.getItem('mo_mqtt_url')||MQTT_DEFAULT, MQTT_SESSION=localStorage.getItem('mo_mqtt_session')||SESSION_DEFAULT;
+const FACTORY={};
+const BANDS=['sub','bass','lowMid','mid','high','air'];
+const HZ={sub:[20,60],bass:[60,140],lowMid:[140,400],mid:[400,1600],high:[1600,5000],air:[5000,14000]};
+const raw={sub:0,bass:0,lowMid:0,mid:0,high:0,air:0},nrm={...raw},peak={sub:8,bass:8,lowMid:8,mid:8,high:8,air:8};
+class Mod{
+ constructor(name,band,min,max,curve,attack,release,rangeMin,rangeMax,step=.01){Object.assign(this,{name,band,min,max,curve,attack,release,rangeMin,rangeMax,step});this.value=min;this.s=0}
+ update(){let x=pow(constrain(nrm[this.band],0,1),this.curve),k=x>this.s?this.attack:this.release;this.s+=(x-this.s)*k;return this.value=this.min+this.s*(this.max-this.min)}
+}
+const MODS={
+ lineSpeed:new Mod('line speed','bass',.45,5.8,.8,.65,.06,0,10),
+ lineJitter:new Mod('line x jitter','mid',0,10,.9,.55,.1,0,30),
+ circleSpeed:new Mod('circle drift','sub',.2,3.8,.75,.55,.07,0,8),
+ circleScale:new Mod('circle scale','lowMid',.7,1.8,.8,.45,.08,.2,3),
+ stripeCount:new Mod('circle stripes','high',3,18,.7,.65,.12,0,30,1),
+ saxChance:new Mod('sax density','air',0,.16,.7,.75,.14,0,.5,.005),
+ saxWeight:new Mod('sax weight','high',.5,6.5,.8,.65,.13,.2,12),
+ saxFade:new Mod('sax linger','mid',5,20,1.2,.35,.08,1,40),
+ scratches:new Mod('film scratches','air',0,.18,1.1,.7,.12,0,.6,.005),
+ paperPulse:new Mod('paper pulse','sub',0,34,.8,.5,.05,0,80)
+},M=n=>MODS[n].value;
+for(const [k,m] of Object.entries(MODS))FACTORY[k]={band:m.band,min:m.min,max:m.max,curve:m.curve,attack:m.attack,release:m.release};
+function setup(){createCanvas(windowWidth,windowHeight);pixelDensity(min(window.devicePixelRatio||1,1.5));fft=new p5.FFT(.8,1024);restoreSettings();buildScene();buildPanel();bindUI();refreshChooser();connectMQTT()}
+function bindUI(){
+ document.getElementById('mic').onclick=e=>{e.stopPropagation();AUDIO_SOURCE='mic';refreshChooser();initAudio()};
+ document.getElementById('music').onclick=e=>{e.stopPropagation();AUDIO_SOURCE='music';refreshChooser();initAudio()};
+ document.getElementById('autoStart').onclick=e=>{e.stopPropagation();AUDIO_SOURCE='auto';AUTO_CRUISE=true;lastControl=0;refreshChooser();initSilentAuto()};
+ document.getElementById('play').onclick=e=>{e.stopPropagation();togglePlay()}
+}
+function buildScene(){lines=[];circles=[];saxStrokes=[];let mobile=windowWidth<600,mul=DENSITY===1?.62:DENSITY===3?1.45:1;
+ for(let i=0;i<floor((mobile?30:50)*mul);i++)lines.push(new TypeLine());
+ for(let i=0;i<floor((mobile?4:8)*mul);i++)circles.push(new GlitchCircle());
+ for(let i=0;i<floor((mobile?4:7)*mul);i++)saxStrokes.push(new SaxStroke())
+}
+function refreshChooser(){document.getElementById('mic').classList.toggle('sel',AUDIO_SOURCE==='mic');document.getElementById('music').classList.toggle('sel',AUDIO_SOURCE==='music');document.getElementById('autoStart').classList.toggle('sel',AUDIO_SOURCE==='auto')}
+function initSilentAuto(){
+ if(started)return;AUDIO_SOURCE='auto';AUTO_CRUISE=true;lastControl=0;started=true;let start=document.getElementById('start');start.classList.add('launching');
+ setTimeout(()=>{start.style.display='none';document.getElementById('transport').style.display='none';publishState()},650)
+}
+function initAudio(){
+ if(started)return;userStartAudio();let start=document.getElementById('start');start.classList.add('launching');started=true;
+ if(AUDIO_SOURCE==='mic')navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}}).then(stream=>{micStream=stream;let ac=getAudioContext();micSrc=ac.createMediaStreamSource(stream);micGain=ac.createGain();micGain.gain.value=MIC_GAIN;micSrc.connect(micGain);fft.setInput(micGain)}).catch(fail);
+ else song=loadSound(AUDIO_URL,()=>{song.loop();fft.setInput(song)},fail);
+ setTimeout(()=>{if(started){start.style.display='none';document.getElementById('transport').style.display=AUDIO_SOURCE==='music'?'block':'none'}},650)
+}
+function fail(err){started=false;let s=document.getElementById('start');s.classList.remove('launching');s.querySelector('.hint').textContent='AUDIO FAILED — use Live Server/HTTPS; check permission and local MP3';console.error(err)}
+function togglePlay(){if(!song)return;let b=document.getElementById('play');if(song.isPlaying()){song.pause();b.textContent='▶'}else{song.loop();b.textContent='Ⅱ'}}
+function adapt(v,p){let next=max(v,p*(1-NORM_DECAY));return next<NORM_FLOOR?[0,next]:[constrain(v/next,0,1),next]}
+function readAudio(){
+ if(AUDIO_SOURCE==='auto'&&started){
+  let t=millis()*.001,beat=pow(max(0,sin(t*2.15)),10),slow=sin(t*.31)*.5+.5;
+  nrm.sub=.18+.48*(sin(t*.43)*.5+.5);nrm.bass=.12+.78*beat;nrm.lowMid=.18+.52*noise(t*.22+10);
+  nrm.mid=.15+.6*(sin(t*.71+1.7)*.5+.5);nrm.high=.08+.72*pow(max(0,sin(t*1.37+2.1)),4);nrm.air=.08+.65*noise(t*.75+80)*(.45+.55*slow);
+  for(let b of BANDS){nrm[b]=constrain(nrm[b]*SENSITIVITY,0,1);raw[b]=nrm[b]*180}rawLevel=BANDS.reduce((sum,b)=>sum+raw[b],0)/6;return
+ }
+ if(started&&fft){fft.analyze();for(let b of BANDS)raw[b]=fft.getEnergy(HZ[b][0],HZ[b][1])}
+ rawLevel=BANDS.reduce((sum,b)=>sum+raw[b],0)/6;
+ for(let b of BANDS){let v;if(NORMALIZE)[v,peak[b]]=adapt(raw[b],peak[b]);else v=raw[b]/255;nrm[b]=constrain(v*SENSITIVITY,0,1)}
+}
+function draw(){
+ readAudio();runAuto();Object.values(MODS).forEach(m=>m.update());let p=constrain(222-M('paperPulse')*liveContrast(),120,235);background(invertFlash>0?18:p,invertFlash>0?18:p-8,invertFlash>0?18:p-27);
+ if(!started){drawHUD();return}
+ push();translate(random(-shake,shake),random(-shake,shake));
+ for(let x of lines){if(!FROZEN)x.update();x.show()}for(let x of circles){if(!FROZEN)x.update();x.show()}
+ if(!FROZEN&&random()<M('saxChance'))random(saxStrokes).trigger();for(let x of saxStrokes)x.show();
+ if(random()<M('scratches')*(.5+liveChaos())){stroke(invertFlash>0?255:0,35+90*nrm.air);strokeWeight(random(.5,2));line(random(width),0,random(width),height)}pop();
+ if(flash>0){noStroke();fill(255,flash);rect(0,0,width,height)}flash*=.78;invertFlash=max(0,invertFlash-1);shake*=.78;perfGuard();if(frameCount%120===0)publishState();drawHUD()
+}
+class TypeLine{
+ constructor(){this.reset(true)}reset(anywhere=false){this.x=random(width);this.y=anywhere?random(height):-random(20,200);this.w=random(1,4);this.h=random(20,200);this.baseSpeed=random(.45,1.7);this.depth=random(.5,2);this.shade=random(100);this.pauseFactor=random(.3,1)}
+ update(){this.y+=this.baseSpeed*M('lineSpeed')*liveMotion()*this.pauseFactor*this.depth;this.x+=random(-M('lineJitter'),M('lineJitter'))*(.4+liveChaos());if(random()<.004+.012*liveChaos())this.pauseFactor=random(.2,2.4);if(this.y>height+this.h)this.reset()}
+ show(){noStroke();fill(invertFlash>0?255-this.shade:this.shade,constrain(120+80*liveContrast(),80,255));rect(this.x,this.y,this.w,this.h)}
+}
+class GlitchCircle{
+ constructor(){this.x=random(width);this.y=random(height);this.r=random(50,150);this.vel=createVector(random(-1,1),random(-1,1))}
+ update(){this.x+=this.vel.x*M('circleSpeed')*liveMotion();this.y+=this.vel.y*M('circleSpeed')*liveMotion();if(this.x<-180)this.x=width+180;if(this.x>width+180)this.x=-180;if(this.y<-180)this.y=height+180;if(this.y>height+180)this.y=-180}
+ show(){push();translate(this.x,this.y);let r=this.r*M('circleScale');scale(1+sin(frameCount*.08)*liveChaos()*.12,1-sin(frameCount*.08)*liveChaos()*.12);noStroke();fill(invertFlash>0?245:0);ellipse(0,0,r);stroke(invertFlash>0?20:220,120+100*liveContrast());for(let i=0;i<max(1,floor(M('stripeCount')));i++){let y=random(-r/2,r/2),half=sqrt(max(0,sq(r/2)-sq(y)));line(-half,y,half,y)}pop()}
+}
+class SaxStroke{
+ constructor(){this.active=false;this.life=0}trigger(){if(this.active)return;this.active=true;this.life=255;this.x1=random(width);this.y1=random(height);this.cx1=random(width);this.cy1=random(height);this.cx2=random(width);this.cy2=random(height);this.x2=random(width);this.y2=random(height)}
+ show(){if(!this.active)return;noFill();stroke(0,this.life);strokeWeight(M('saxWeight'));bezier(this.x1,this.y1,this.cx1,this.cy1,this.cx2,this.cy2,this.x2,this.y2);if(!FROZEN)this.life-=M('saxFade');if(this.life<=0)this.active=false}
+}
+function liveMotion(){return autoActive?.7+(sin(frameCount*.006)*.5+.5)*1.45:MOTION}
+function liveChaos(){return autoActive?.2+(sin(frameCount*.004+2)*.5+.5)*.68:CHAOS}
+function liveContrast(){return autoActive?.75+(sin(frameCount*.003+4)*.5+.5)*.75:CONTRAST}
+function runAuto(){
+ autoActive=AUTO_CRUISE&&(!lastControl||Date.now()-lastControl>30000);
+ if(autoActive&&started&&millis()-lastAutoHit>6500+random(8000)){lastAutoHit=millis();trigger(random(['sax','speed','explode','invert','shake']),false)}
+}
+function trigger(name){
+ if((name==='start'||name==='auto')&&!started)initSilentAuto();
+ if(name==='speed'){MOTION=min(3,MOTION+1.25);setTimeout(()=>{MOTION=max(.2,MOTION-1.25);saveSettings()},700)}
+ if(name==='sax')for(let i=0;i<saxStrokes.length;i++){saxStrokes[i].active=false;saxStrokes[i].trigger()}
+ if(name==='explode')for(let c of circles){c.vel.mult(2.8);setTimeout(()=>c.vel.mult(.357),900)}
+ if(name==='flash')flash=220;
+ if(name==='invert')invertFlash=12;
+ if(name==='shake')shake=28;
+ if(name==='reset')buildScene();
+ publishState()
+}
+function snapshot(){let mods={};for(let [k,m] of Object.entries(MODS))mods[k]={band:m.band,min:m.min,max:m.max,curve:m.curve,attack:m.attack,release:m.release};return{mods,macros:{MOTION,CHAOS,CONTRAST},global:{SENSITIVITY,DENSITY,NORMALIZE,FROZEN,AUTO_CRUISE},autoActive}}
+function applyState(s,rebuild=true){
+ if(s.mods)for(let [k,v] of Object.entries(s.mods))if(MODS[k])Object.assign(MODS[k],v);
+ if(s.macros){MOTION=Number(s.macros.MOTION??MOTION);CHAOS=Number(s.macros.CHAOS??CHAOS);CONTRAST=Number(s.macros.CONTRAST??CONTRAST)}
+ if(s.global){SENSITIVITY=Number(s.global.SENSITIVITY??SENSITIVITY);DENSITY=Number(s.global.DENSITY??DENSITY);NORMALIZE=s.global.NORMALIZE??NORMALIZE;FROZEN=s.global.FROZEN??FROZEN;AUTO_CRUISE=s.global.AUTO_CRUISE??AUTO_CRUISE}
+ if(rebuild){buildScene();buildPanel()}saveSettings()
+}
+function savePreset(i){localStorage.setItem('mo_preset_'+i,JSON.stringify(snapshot()));publishState()}
+function loadPreset(i){let s=localStorage.getItem('mo_preset_'+i);if(s)applyState(JSON.parse(s))}
+function restoreSettings(){let s=localStorage.getItem('mo_settings');if(s)try{applyState(JSON.parse(s),false)}catch(e){} }
+function saveSettings(){localStorage.setItem('mo_settings',JSON.stringify(snapshot()))}
+function resetMod(k){Object.assign(MODS[k],FACTORY[k]);MODS[k].s=0;buildPanel();saveSettings();publishState()}
+function perfGuard(){if(frameRate()<28)lowFpsFrames++;else lowFpsFrames=max(0,lowFpsFrames-1);if(lowFpsFrames>150&&DENSITY>1){DENSITY--;buildScene();lowFpsFrames=0;saveSettings();publishState()}}
+function mqttTopic(){return 'ooakosimo/mo-keys/'+MQTT_SESSION.replace(/[^a-z0-9_-]/gi,'-')}
+function connectMQTT(){
+ let el=document.getElementById('mqttStatus');if(!window.mqtt){el.textContent='REMOTE: MQTT library unavailable';return}
+ if(mqttClient)try{mqttClient.end(true)}catch(e){}
+ el.textContent='REMOTE: connecting…';el.className='warn';
+ mqttClient=mqtt.connect(MQTT_URL,{clientId:'mo_visual_'+Math.random().toString(16).slice(2),reconnectPeriod:3000,connectTimeout:10000,clean:true});
+ mqttClient.on('connect',()=>{el.textContent='REMOTE: online · '+MQTT_SESSION;el.className='ok';mqttClient.subscribe(mqttTopic()+'/cmd');publishState()});
+ mqttClient.on('reconnect',()=>{el.textContent='REMOTE: reconnecting…';el.className='warn'});
+ mqttClient.on('error',()=>{el.textContent='REMOTE: broker unavailable';el.className='warn'});
+ mqttClient.on('message',(topic,payload)=>{try{handleRemote(JSON.parse(payload.toString()))}catch(e){console.warn('remote command ignored',e)}})
+}
+function handleRemote(c){
+ lastControl=Date.now();if(c.type==='set'&&c.path){let [group,key,prop]=c.path.split('.');if(group==='mods'&&MODS[key])MODS[key][prop]=prop==='band'?c.value:Number(c.value);if(group==='macros'){if(key==='MOTION')MOTION=Number(c.value);if(key==='CHAOS')CHAOS=Number(c.value);if(key==='CONTRAST')CONTRAST=Number(c.value)}if(group==='global'){if(key==='SENSITIVITY')SENSITIVITY=Number(c.value);if(key==='DENSITY'){DENSITY=Number(c.value);buildScene()}if(key==='NORMALIZE')NORMALIZE=!!c.value;if(key==='FROZEN')FROZEN=!!c.value;if(key==='AUTO_CRUISE')AUTO_CRUISE=!!c.value}saveSettings();publishState();return}
+ if(c.type==='trigger')trigger(c.name);if(c.type==='preset')c.action==='save'?savePreset(c.index):loadPreset(c.index);if(c.type==='config'){MQTT_URL=c.url||MQTT_URL;MQTT_SESSION=c.session||MQTT_SESSION;localStorage.setItem('mo_mqtt_url',MQTT_URL);localStorage.setItem('mo_mqtt_session',MQTT_SESSION);connectMQTT()}
+}
+function publishState(){if(mqttClient&&mqttClient.connected)mqttClient.publish(mqttTopic()+'/state',JSON.stringify({type:'state',...snapshot(),fps:round(frameRate()),started}),{retain:true})}
+function slider(prop,value,minv,maxv,step){return `<div class="row"><label>${prop}</label><input type="range" data-prop="${prop}" min="${minv}" max="${maxv}" step="${step}" value="${value}"><span class="value" data-value="${prop}">${fmt(value)}</span></div>`}
+function fmt(v){return abs(v)>=10?Number(v).toFixed(0):Number(v).toFixed(2).replace(/0+$/,'').replace(/\.$/,'')}
+function buildPanel(){
+ let p=document.getElementById('panel'),html=`<h2>MO // PERFORMANCE BAY</h2><div class="hint">Everything here is mirrored by REMIX_REMOTE.html · S hides</div>
+ <div class="slot"><div class="slot-name">MASTER MACROS</div>${slider('MOTION',MOTION,.2,3,.05)}${slider('CHAOS',CHAOS,0,1,.01)}${slider('CONTRAST',CONTRAST,.3,2,.05)}</div>
+ <div class="slot"><div class="slot-name">TRIGGERS</div><div class="row"><button data-trigger="speed">RAMP</button><button data-trigger="sax">SAX</button><button data-trigger="explode">BURST</button><button data-trigger="flash">FLASH</button><button data-trigger="invert">INVERT</button></div><div class="row"><button id="autoToggle">AUTO CRUISE: ${AUTO_CRUISE?'ON':'OFF'}</button><span>${autoActive?'cruising':'pilot window'}</span></div></div>
+ <div class="slot"><div class="slot-name">PRESETS</div>${[1,2,3,4,5,6].map(i=>`<div class="row"><b>${i}</b><button data-load="${i}">LOAD</button><button data-save="${i}">SAVE</button></div>`).join('')}</div>
+ <div class="slot"><div class="slot-name">MQTT REMOTE</div><div class="row"><label>broker</label><input id="brokerInput" value="${MQTT_URL}"></div><div class="row"><label>session</label><input id="sessionInput" value="${MQTT_SESSION}"><button id="mqttApply">CONNECT</button></div></div>
+ <div class="hint">MOD SLOTS · click a property name to collapse it</div>`;
+ for(let [key,m] of Object.entries(MODS)){let opts=BANDS.map(b=>`<option value="${b}" ${b===m.band?'selected':''}>${b}</option>`).join('');
+ html+=`<details class="slot" data-key="${key}"><summary class="slot-name">${m.name}</summary><div class="row"><label>band</label><select data-prop="band">${opts}</select></div>${slider('min',m.min,m.rangeMin,m.rangeMax,m.step)}${slider('max',m.max,m.rangeMin,m.rangeMax,m.step)}${slider('curve',m.curve,.25,3,.05)}${slider('attack',m.attack,.02,1,.01)}${slider('release',m.release,.01,.7,.01)}<button data-reset="${key}">RESET SLOT</button></details>`}
+ p.innerHTML=html;
+ p.querySelectorAll('[data-key]').forEach(slot=>slot.querySelectorAll('select,input').forEach(c=>c.oninput=()=>{lastControl=Date.now();let m=MODS[slot.dataset.key],prop=c.dataset.prop;m[prop]=prop==='band'?c.value:parseFloat(c.value);let out=slot.querySelector(`[data-value="${prop}"]`);if(out)out.textContent=fmt(m[prop]);saveSettings();publishState()}));
+ p.querySelectorAll('[data-trigger]').forEach(b=>b.onclick=()=>trigger(b.dataset.trigger));p.querySelectorAll('[data-load]').forEach(b=>b.onclick=()=>loadPreset(b.dataset.load));p.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>savePreset(b.dataset.save));p.querySelectorAll('[data-reset]').forEach(b=>b.onclick=()=>resetMod(b.dataset.reset));
+ ['MOTION','CHAOS','CONTRAST'].forEach(name=>{let c=p.querySelector(`[data-prop="${name}"]`);c.oninput=()=>{lastControl=Date.now();if(name==='MOTION')MOTION=Number(c.value);if(name==='CHAOS')CHAOS=Number(c.value);if(name==='CONTRAST')CONTRAST=Number(c.value);c.nextElementSibling.textContent=fmt(c.value);saveSettings();publishState()}});p.querySelector('#autoToggle').onclick=()=>{AUTO_CRUISE=!AUTO_CRUISE;lastControl=AUTO_CRUISE?0:Date.now();buildPanel();saveSettings();publishState()};
+ p.querySelector('#mqttApply').onclick=()=>{MQTT_URL=p.querySelector('#brokerInput').value.trim();MQTT_SESSION=p.querySelector('#sessionInput').value.trim()||SESSION_DEFAULT;localStorage.setItem('mo_mqtt_url',MQTT_URL);localStorage.setItem('mo_mqtt_session',MQTT_SESSION);connectMQTT()}
+}
+function drawHUD(){let h=document.getElementById('hud');if(!SHOW_HUD){h.textContent='';return}let bars=constrain(floor(rawLevel/13),0,12),meter='['+'#'.repeat(bars)+'-'.repeat(12-bars)+']',pad=v=>String(round(v*99)).padStart(2,'0');
+ h.textContent=`MO ON THE KEYS v2  ${AUDIO_SOURCE.toUpperCase()}  ${started?'LIVE':'IDLE'}  in:${meter} ${rawLevel.toFixed(0)}\nsub:${pad(nrm.sub)} bas:${pad(nrm.bass)} lm:${pad(nrm.lowMid)} mid:${pad(nrm.mid)} hi:${pad(nrm.high)} air:${pad(nrm.air)}\nS:panel ${SHOW_PANEL?'ON':'off'}  AUTO:${AUTO_CRUISE?(autoActive?'CRUISE':'armed'):'off'}  dens:${DENSITY}  sens:${SENSITIVITY.toFixed(1)}  fps:${frameRate().toFixed(0)}`
+}
+function keyPressed(){lastControl=Date.now();let k=key.toLowerCase();if(!started&&k==='m'){AUDIO_SOURCE=AUDIO_SOURCE==='mic'?'music':'mic';refreshChooser()}if(!started&&keyCode===ENTER){initAudio();return false}if(k==='s'){SHOW_PANEL=!SHOW_PANEL;document.getElementById('panel').style.display=SHOW_PANEL?'block':'none'}if(k==='a'){AUTO_CRUISE=!AUTO_CRUISE;if(AUTO_CRUISE)lastControl=0}if(k==='p'&&AUDIO_SOURCE==='music')togglePlay();if(k==='j')NORMALIZE=!NORMALIZE;if(k==='0')SHOW_HUD=!SHOW_HUD;if(k==='f')fullscreen(!fullscreen());if(k===' ')FROZEN=!FROZEN;if(k==='q')trigger('speed');if(k==='w')trigger('sax');if(k==='e')trigger('explode');if(k==='r')trigger('flash');if(k==='t')trigger('invert');if(k===';'){MIC_GAIN=max(.2,MIC_GAIN-.2);if(micGain)micGain.gain.value=MIC_GAIN}if(k==='l'){MIC_GAIN=min(8,MIC_GAIN+.2);if(micGain)micGain.gain.value=MIC_GAIN}if(key==='+'||key==='=')SENSITIVITY=min(3,SENSITIVITY+.1);if(key==='-'||key==='_')SENSITIVITY=max(.2,SENSITIVITY-.1);if(['1','2','3'].includes(key)){DENSITY=Number(key);buildScene()}saveSettings();publishState();return false}
+function mousePressed(){if(SHOW_PANEL&&mouseX>windowWidth-350)return;lastControl=Date.now();if(started&&saxStrokes.length)random(saxStrokes).trigger()}
+function windowResized(){resizeCanvas(windowWidth,windowHeight);pixelDensity(min(window.devicePixelRatio||1,1.5));buildScene()}
+</script></body></html>

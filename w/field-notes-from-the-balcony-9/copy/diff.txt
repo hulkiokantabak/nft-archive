@@ -1,0 +1,26 @@
+# MO ON THE KEYS :: PSYCHO NOIR // VJ MOD INSTRUMENT - Mohini (signs as OOAKOSIMO) (FIELD NOTES FROM THE BALCONY): original.html -> index.html
+# The ONLY changes: each outside URL below replaced by its relative deps/ path (occurrences in the file):
+#   https://ooakosimo.neocities.org/keys/p5.min.js  ->  deps/p5.min.js  (1x)
+#   https://ooakosimo.neocities.org/keys/p5.sound.min.js  ->  deps/p5.sound.min.js  (1x)
+#   https://ooakosimo.neocities.org/keys/mqtt.min.js  ->  deps/mqtt.min.js  (1x)
+#   https://ooakosimo.neocities.org/keys/mo-on-keys-coverFIN.png  ->  deps/mo-on-keys-coverFIN.png  (1x)
+#   https://ooakosimo.neocities.org/keys/Mo-on-the-keys-v1.mp3  ->  deps/Mo-on-the-keys-v1.mp3  (1x)
+#   https://ooakosimo.neocities.org/gumamela.gif  ->  deps/gumamela.gif  (1x)
+# Reverse check: putting the URLs back into index.html gives original.html byte for byte: YES
+# original.html sha256 5b71b86e8af85e0e828277cac0d9682089927992cc326458eb7dc05adc6a294b (23,969 B); index.html sha256 2921ff1d79b2d956dad2963bc6b1b147eda720292bc5fcf3d07fe5eb85346c2e (23,782 B)
+--- original.html
++++ index.html
+@@ -6 +6 @@
+-<link rel="icon" href="https://ooakosimo.neocities.org/gumamela.gif" type="image/gif">
++<link rel="icon" href="deps/gumamela.gif" type="image/gif">
+@@ -9,2 +9,2 @@
+-<script src="https://ooakosimo.neocities.org/keys/p5.min.js"></script><script src="https://ooakosimo.neocities.org/keys/p5.sound.min.js"></script>
+-<script src="https://ooakosimo.neocities.org/keys/mqtt.min.js"></script>
++<script src="deps/p5.min.js"></script><script src="deps/p5.sound.min.js"></script>
++<script src="deps/mqtt.min.js"></script>
+@@ -14 +14 @@
+-#start{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 20px 12vh;background:var(--paper) url('https://ooakosimo.neocities.org/keys/mo-on-keys-coverFIN.png') no-repeat center/cover;text-align:center;transition:opacity .65s,transform .65s cubic-bezier(.6,-.28,.735,.045);animation:zoom 10s infinite alternate ease-in-out}
++#start{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 20px 12vh;background:var(--paper) url('deps/mo-on-keys-coverFIN.png') no-repeat center/cover;text-align:center;transition:opacity .65s,transform .65s cubic-bezier(.6,-.28,.735,.045);animation:zoom 10s infinite alternate ease-in-out}
+@@ -33 +33 @@
+-const AUDIO_URL='https://ooakosimo.neocities.org/keys/Mo-on-the-keys-v1.mp3',NORM_DECAY=.0006,NORM_FLOOR=6;
++const AUDIO_URL='deps/Mo-on-the-keys-v1.mp3',NORM_DECAY=.0006,NORM_FLOOR=6;

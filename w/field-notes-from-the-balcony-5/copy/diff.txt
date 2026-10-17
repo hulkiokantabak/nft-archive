@@ -1,0 +1,10 @@
+# Alamat ng Pinya: The Thousand-Eyed Satellite - Mohini (signs as OOAKOSIMO) (FIELD NOTES FROM THE BALCONY): original.html -> index.html
+# The ONLY changes: each outside URL below replaced by its relative deps/ path (occurrences in the file):
+#   https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js  ->  deps/p5.min.js  (1x)
+# Reverse check: putting the URLs back into index.html gives original.html byte for byte: YES
+# original.html sha256 e69d15b7cbea75e0ac66660b667ea0b8ba9150a2b04693d31811015b6d5025a4 (4,188 B); index.html sha256 6d705e374438c681f02c74ca491deae6325b8f47267a9e41fbcc08cd77305426 (4,142 B)
+--- original.html
++++ index.html
+@@ -7 +7 @@
+-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
++    <script src="deps/p5.min.js"></script>
